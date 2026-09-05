@@ -226,7 +226,7 @@ BackgroundFrame.Parent = ScreenGui
 
 local MenuFrame = Instance.new("Frame")
 MenuFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-MenuFrame.Size = UDim2.fromOffset(390, 0)
+MenuFrame.Size = UDim2.fromOffset(390, 0)  -- height will be set later
 MenuFrame.Position = UDim2.fromScale(0.5, 0.5)
 MenuFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 MenuFrame.BorderSizePixel = 0
@@ -268,9 +268,9 @@ MenuSubtitle.TextXAlignment = Enum.TextXAlignment.Left
 MenuSubtitle.ZIndex = 102
 MenuSubtitle.Parent = MenuFrame
 
-
+-- Replaced ScrollingFrame with a plain Frame that auto-sizes
 local ToggleContainer = Instance.new("Frame")
-ToggleContainer.Size = UDim2.new(1, -30, 0, 0)
+ToggleContainer.Size = UDim2.new(1, -30, 0, 0)   -- width fills, height auto
 ToggleContainer.Position = UDim2.new(0, 15, 0, 70)
 ToggleContainer.BackgroundTransparency = 1
 ToggleContainer.BorderSizePixel = 0
@@ -607,7 +607,7 @@ local function createChildSlider(name, getMaster, parentGroup, order)
     return wrapper, updateSliderVisual, updateSliderPosition
 end
 
-
+-- Triggerbot (order 1)
 createMasterToggle(
     "Triggerbot",
     function()
@@ -619,7 +619,7 @@ createMasterToggle(
     1
 )
 
-
+-- Inf Jump (order 2)
 createMasterToggle(
     "Inf Jump",
     function()
@@ -631,7 +631,7 @@ createMasterToggle(
     2
 )
 
-
+-- ESP Master (order 3)
 createMasterToggle(
     "ESP Master",
     function()
@@ -643,7 +643,7 @@ createMasterToggle(
     3
 )
 
-
+-- ESP child group (order 4)
 local espGroup = createChildGroup(
     "ESP",
     function()
@@ -718,7 +718,7 @@ createChildToggle(
     4
 )
 
-
+-- Aimbot Master (order 5)
 createMasterToggle(
     "Aimbot",
     function()
@@ -730,7 +730,7 @@ createMasterToggle(
     5
 )
 
-
+-- Aimbot child group (order 6)
 local aimbotGroup = createChildGroup(
     "Aimbot",
     function()
@@ -773,18 +773,18 @@ table.insert(aimbotChildren, updateFOVVisual)
 
 updateAllSubToggles()
 
-
+-- ===== Dynamically resize menu to fit content =====
 task.defer(function()
-
+    -- Wait for layout to settle
     task.wait(0.1)
     local containerHeight = ToggleContainer.AbsoluteSize.Y
     if containerHeight > 0 then
-        local totalHeight = 70 + containerHeight + 15
+        local totalHeight = 70 + containerHeight + 15  -- top offset + bottom padding
         MenuFrame.Size = UDim2.new(0, 390, 0, totalHeight)
     end
 end)
 
-
+-- ===== INFINITE JUMP (clean version) =====
 UserInputService.JumpRequest:Connect(function()
     if Settings.InfJump_Enabled then
         local character = LocalPlayer.Character
@@ -797,7 +797,7 @@ UserInputService.JumpRequest:Connect(function()
     end
 end)
 
-
+-- ===== TEAM DETECTION (unchanged) =====
 local teamCache = {}
 local teamCacheTime = {}
 local TEAM_CACHE_DURATION = 0.15
@@ -1224,7 +1224,7 @@ Players.PlayerRemoving:Connect(function(player)
     removeTracerLine(player)
 end)
 
-
+-- Tracer target: Head (or Root as fallback)
 local function getTracerTarget(character, root)
     local head = character:FindFirstChild("Head")
     if head then
@@ -1686,7 +1686,7 @@ local function updateESP()
     end
 end
 
-
+-- Menu toggle (Right Control)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then
         return
