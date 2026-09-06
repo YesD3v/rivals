@@ -81,9 +81,6 @@ Settings.ESP_Snapline = nil
 Settings.ESP_BoxColor = Color3.fromRGB(255, 255, 255)
 Settings.Triggerbot_MaxDistance = 1000
 
--- =============================================
--- GAME STATE DETECTION
--- =============================================
 
 local function isVoteScreenActive()
     local playerGui =
@@ -185,9 +182,6 @@ local function isInActiveRound()
     return true
 end
 
--- =============================================
--- STARTUP OVERLAY
--- =============================================
 
 local function ShowStartup()
     local playerGui =
@@ -373,9 +367,6 @@ end
 
 ShowStartup()
 
--- =============================================
--- MENU GUI
--- =============================================
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MenuGUI"
@@ -1151,9 +1142,6 @@ task.defer(function()
     end
 end)
 
--- =============================================
--- HELPERS
--- =============================================
 
 local teamCache = {}
 local teamCacheTime = {}
@@ -1581,9 +1569,6 @@ local function hasLineOfSight(targetPart)
         )
 end
 
--- =============================================
--- INFINITE JUMP
--- =============================================
 
 UserInputService.JumpRequest:Connect(function()
     if Settings.InfJump_Enabled then
@@ -1606,15 +1591,17 @@ UserInputService.JumpRequest:Connect(function()
     end
 end)
 
--- =============================================
--- AIMBOT
--- =============================================
 
 local lockedTarget = nil
 
 local function getAimTarget()
     local crosshair =
         getCrosshairPosition()
+
+    local localChar = LocalPlayer.Character
+    if not localChar then return nil end
+    local localRoot = localChar:FindFirstChild("HumanoidRootPart")
+    if not localRoot then return nil end
 
     if lockedTarget then
         if not isEnemy(lockedTarget) then
@@ -1640,7 +1627,10 @@ local function getAimTarget()
                 and humanoid
                 and humanoid.Health > 0 then
 
-                if Settings.Aimbot_WallCheck
+                local dist = (localRoot.Position - head.Position).Magnitude
+                if dist > Settings.Triggerbot_MaxDistance then
+                    lockedTarget = nil
+                elseif Settings.Aimbot_WallCheck
                     and not hasLineOfSight(head) then
 
                     lockedTarget = nil
@@ -1672,6 +1662,11 @@ local function getAimTarget()
             )
 
         if head then
+            local dist = (localRoot.Position - head.Position).Magnitude
+            if dist > Settings.Triggerbot_MaxDistance then
+                continue
+            end
+
             local screenPos, onScreen =
                 worldToScreen(
                     head.Position
@@ -1793,6 +1788,18 @@ local function updateLockedBody()
         return
     end
 
+    local localChar = LocalPlayer.Character
+    if localChar then
+        local localRoot = localChar:FindFirstChild("HumanoidRootPart")
+        if localRoot then
+            local dist = (localRoot.Position - head.Position).Magnitude
+            if dist > Settings.Triggerbot_MaxDistance then
+                lockedTarget = nil
+                return
+            end
+        end
+    end
+
     if Settings.Aimbot_WallCheck
         and not hasLineOfSight(head) then
 
@@ -1803,9 +1810,6 @@ local function updateLockedBody()
     forceAimAtHead(head)
 end
 
--- =============================================
--- TRIGGERBOT
--- =============================================
 
 local HITBOX_PARTS = {
     "Head",
@@ -2055,9 +2059,6 @@ local function shouldFire()
     return false
 end
 
--- =============================================
--- TRACER LINES
--- =============================================
 
 local tracerLines = {}
 
@@ -2238,9 +2239,6 @@ local function updateTracer()
     end
 end
 
--- =============================================
--- FOV CIRCLE
--- =============================================
 
 local circleDraw = nil
 
@@ -2277,9 +2275,6 @@ local function updateCircle()
     end
 end
 
--- =============================================
--- TAB HOLD
--- =============================================
 
 local tabHeld = false
 
@@ -2309,9 +2304,6 @@ local function releaseTab()
     end
 end
 
--- =============================================
--- MENU HELPERS
--- =============================================
 
 local AutoclickActive = false
 
@@ -2350,9 +2342,6 @@ BackgroundFrame.InputBegan:Connect(function(input)
     end
 end)
 
--- =============================================
--- ESP
--- =============================================
 
 local function removeESPObjects(character)
     if not character then
@@ -2405,9 +2394,6 @@ local function removeESPObjects(character)
     end
 end
 
--- =============================================
--- ESP BILLBOARD
--- =============================================
 
 local ESP_GUI_WIDTH = 220
 local ESP_GUI_HEIGHT = 58
@@ -2456,9 +2442,6 @@ local function createESPBillboard(
     billboard.Parent =
         character
 
-    -- =============================================
-    -- HEALTH BAR OUTLINE
-    -- =============================================
 
     local healthOutline =
         Instance.new("Frame")
@@ -2498,9 +2481,6 @@ local function createESPBillboard(
         4
     )
 
-    -- =============================================
-    -- HEALTH BAR BACKGROUND
-    -- =============================================
 
     local healthBackground =
         Instance.new("Frame")
@@ -2541,9 +2521,6 @@ local function createESPBillboard(
         3
     )
 
-    -- =============================================
-    -- HEALTH BAR FILL
-    -- =============================================
 
     local healthBar =
         Instance.new("Frame")
@@ -2584,9 +2561,6 @@ local function createESPBillboard(
         3
     )
 
-    -- =============================================
-    -- NAME + STUDS
-    -- =============================================
 
     local infoLabel =
         Instance.new("TextLabel")
@@ -2665,8 +2639,7 @@ local function updateESP()
 
     local localRoot =
         localCharacter
-        and localCharacter:
-        FindFirstChild(
+        and localCharacter:FindFirstChild(
             "HumanoidRootPart"
         )
 
@@ -2732,9 +2705,6 @@ local function updateESP()
             continue
         end
 
-        -- =============================================
-        -- HIGHLIGHT
-        -- =============================================
 
         local highlight =
             character:FindFirstChild(
@@ -2780,9 +2750,6 @@ local function updateESP()
             highlight:Destroy()
         end
 
-        -- =============================================
-        -- FIXED ESP BILLBOARD
-        -- =============================================
 
         local billboard =
             character:FindFirstChild(
@@ -2833,9 +2800,6 @@ local function updateESP()
         billboard.Enabled =
             true
 
-        -- =============================================
-        -- HEALTH BAR
-        -- =============================================
 
         local healthOutline =
             billboard:FindFirstChild(
@@ -2966,9 +2930,6 @@ local function updateESP()
             end
         end
 
-        -- =============================================
-        -- NAME + STUDS
-        -- =============================================
 
         local infoLabel =
             billboard:FindFirstChild(
@@ -3026,9 +2987,6 @@ local function updateESP()
             end
         end
 
-        -- =============================================
-        -- KEEP ALL ESP ELEMENTS FIXED
-        -- =============================================
 
         billboard.Size =
             UDim2.fromOffset(
@@ -3045,9 +3003,6 @@ local function updateESP()
     end
 end
 
--- =============================================
--- MENU TOGGLE — Right Control
--- =============================================
 
 UserInputService.InputBegan:Connect(function(
     input,
@@ -3068,9 +3023,6 @@ UserInputService.InputBegan:Connect(function(
     end
 end)
 
--- =============================================
--- AUTOCLICKER
--- =============================================
 
 task.spawn(function()
     while true do
@@ -3118,9 +3070,6 @@ task.spawn(function()
     end
 end)
 
--- =============================================
--- MAIN LOOP
--- =============================================
 
 task.spawn(function()
     RunService.RenderStepped:Connect(function()
@@ -3167,9 +3116,6 @@ task.spawn(function()
     end)
 end)
 
--- =============================================
--- ESP TIMER
--- =============================================
 
 task.spawn(function()
     while task.wait(0.15) do
