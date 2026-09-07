@@ -152,6 +152,10 @@ end
 findControlsRemote()
 
 local function spoofDevice(value)
+    if not value then
+        return false
+    end
+
     if not SetControlsRemote
         or not SetControlsRemote.Parent then
 
@@ -167,9 +171,17 @@ local function spoofDevice(value)
 
         task.wait(0.3)
 
-        SetControlsRemote:FireServer(
-            value
-        )
+        if not SetControlsRemote
+            or not SetControlsRemote.Parent then
+
+            findControlsRemote()
+        end
+
+        if SetControlsRemote then
+            SetControlsRemote:FireServer(
+                value
+            )
+        end
     end)
 
     return ok
@@ -190,27 +202,61 @@ local function applySavedDevice()
             game.Loaded:Wait()
         end
 
-        task.wait(1)
+        while not LocalPlayer.Character do
+            task.wait(0.1)
+        end
 
-        for i = 1, 15 do
-            if not Settings.DeviceSpoofer_Enabled
-                or Settings.DeviceSpoofer_Active
-                    ~= savedDevice then
+        local character =
+            LocalPlayer.Character
 
-                return
-            end
+        local humanoid =
+            character:FindFirstChildOfClass(
+                "Humanoid"
+            )
 
-            if not SetControlsRemote
-                or not SetControlsRemote.Parent then
+        local root =
+            character:FindFirstChild(
+                "HumanoidRootPart"
+            )
 
-                findControlsRemote()
-            end
+        local deadline =
+            os.clock() + 5
+
+        while (
+            not humanoid
+            or not root
+        )
+            and os.clock() < deadline do
+
+            character =
+                LocalPlayer.Character
+
+            humanoid =
+                character
+                and character:
+                FindFirstChildOfClass(
+                    "Humanoid"
+                )
+
+            root =
+                character
+                and character:
+                FindFirstChild(
+                    "HumanoidRootPart"
+                )
+
+            task.wait(0.1)
+        end
+
+        task.wait(2)
+
+        if Settings.DeviceSpoofer_Enabled
+            and Settings.DeviceSpoofer_Active
+                == savedDevice then
 
             spoofDevice(
                 savedDevice
             )
-
-            task.wait(1)
         end
     end)
 end
@@ -1180,7 +1226,9 @@ local function createMasterToggle(
         button
 
     local indicator =
-        makeIndicator(button)
+        makeIndicator(
+            button
+        )
 
     local function updateVisual()
         indicator.BackgroundColor3 =
@@ -1205,11 +1253,14 @@ local function createMasterToggle(
 
             updateVisual()
             updateAllSubToggles()
-            saveSettings(Settings)
+            saveSettings(
+                Settings
+            )
         end
     )
 
     updateVisual()
+
     toggleButtons[button] =
         updateVisual
 
@@ -1573,7 +1624,9 @@ local function createChildToggle(
             )
 
             updateVisual()
-            saveSettings(Settings)
+            saveSettings(
+                Settings
+            )
         end
     )
 
@@ -1928,8 +1981,7 @@ local function createChildSlider(
                     local snappedValue =
                         math.floor(
                             (
-                                rawValue +
-                                2.5
+                                rawValue + 2.5
                             ) / 5
                         ) * 5
 
@@ -2147,9 +2199,7 @@ table.insert(
 
 updateAllSubToggles()
 
-local function resizeMenu(
-    animated
-)
+local function resizeMenu(animated)
     local h =
         70
         + ToggleContainer.AbsoluteSize.Y
@@ -2194,15 +2244,15 @@ task.defer(
 
 local devices = {
     {
-        "PC  (Mouse & Keyboard)",
+        "PC (Mouse & Keyboard)",
         "MouseKeyboard"
     },
     {
-        "Console  (Gamepad)",
+        "Console (Gamepad)",
         "Gamepad"
     },
     {
-        "Mobile  (Touch)",
+        "Mobile (Touch)",
         "Touch"
     },
     {
@@ -2210,19 +2260,6 @@ local devices = {
         "VR"
     }
 }
-
-local SPOOFER_HEADER_HEIGHT =
-    39
-
-local SPOOFER_GAP =
-    4
-
-local SPOOFER_TWEEN =
-    TweenInfo.new(
-        0.28,
-        Enum.EasingStyle.Quint,
-        Enum.EasingDirection.Out
-    )
 
 local spoofer =
     Instance.new("Frame")
@@ -2232,14 +2269,14 @@ spoofer.Size =
         1,
         -6,
         0,
-        SPOOFER_HEADER_HEIGHT
+        0
     )
+
+spoofer.AutomaticSize =
+    Enum.AutomaticSize.Y
 
 spoofer.BackgroundTransparency =
     1
-
-spoofer.BorderSizePixel =
-    0
 
 spoofer.LayoutOrder =
     7
@@ -2251,22 +2288,14 @@ spoofer.Parent =
     ToggleContainer
 
 local spooferHeader =
-    Instance.new("TextButton")
+    Instance.new("Frame")
 
 spooferHeader.Size =
     UDim2.new(
         1,
         0,
         0,
-        SPOOFER_HEADER_HEIGHT
-    )
-
-spooferHeader.Position =
-    UDim2.new(
-        0,
-        0,
-        0,
-        0
+        39
     )
 
 spooferHeader.BackgroundColor3 =
@@ -2279,12 +2308,6 @@ spooferHeader.BackgroundColor3 =
 spooferHeader.BorderSizePixel =
     0
 
-spooferHeader.Text =
-    ""
-
-spooferHeader.AutoButtonColor =
-    false
-
 spooferHeader.ZIndex =
     105
 
@@ -2296,102 +2319,93 @@ makeCorner(
     9
 )
 
-local spooferLabel =
-    Instance.new("TextLabel")
+local enableButton =
+    Instance.new("TextButton")
 
-spooferLabel.Size =
+enableButton.Size =
     UDim2.new(
         1,
-        -42,
+        -46,
         1,
         0
     )
 
-spooferLabel.Position =
-    UDim2.new(
-        0,
-        14,
-        0,
-        0
-    )
-
-spooferLabel.BackgroundTransparency =
+enableButton.BackgroundTransparency =
     1
 
-spooferLabel.Text =
+enableButton.AutoButtonColor =
+    false
+
+enableButton.Text =
     "Device Spoofer"
 
-spooferLabel.TextColor3 =
+enableButton.TextColor3 =
     Color3.fromRGB(
         235,
         235,
         235
     )
 
-spooferLabel.Font =
+enableButton.Font =
     Enum.Font.GothamBold
 
-spooferLabel.TextSize =
+enableButton.TextSize =
     15
 
-spooferLabel.TextXAlignment =
+enableButton.TextXAlignment =
     Enum.TextXAlignment.Left
 
-spooferLabel.ZIndex =
+enableButton.ZIndex =
     106
 
-spooferLabel.Parent =
+enableButton.Parent =
     spooferHeader
 
-local spooferArrow =
-    Instance.new("TextLabel")
+local arrowButton =
+    Instance.new("TextButton")
 
-spooferArrow.Size =
-    UDim2.fromOffset(
-        18,
-        18
-    )
-
-spooferArrow.AnchorPoint =
-    Vector2.new(
-        0.5,
-        0.5
-    )
-
-spooferArrow.Position =
+arrowButton.Size =
     UDim2.new(
+        0,
+        46,
         1,
-        -12,
-        0.5,
         0
     )
 
-spooferArrow.BackgroundTransparency =
+arrowButton.Position =
+    UDim2.new(
+        1,
+        -46,
+        0,
+        0
+    )
+
+arrowButton.BackgroundTransparency =
     1
 
-spooferArrow.Text =
-    "▼"
+arrowButton.AutoButtonColor =
+    false
 
-spooferArrow.TextColor3 =
+arrowButton.Text =
+    "›"
+
+arrowButton.TextColor3 =
     Color3.fromRGB(
         170,
         170,
         170
     )
 
-spooferArrow.Font =
+arrowButton.Font =
     Enum.Font.GothamBold
 
-spooferArrow.TextSize =
-    13
+arrowButton.TextSize =
+    20
 
-spooferArrow.Rotation =
-    90
+arrowButton.ZIndex =
+    107
 
-spooferArrow.ZIndex =
-    106
-
-spooferArrow.Parent =
+arrowButton.Parent =
     spooferHeader
 
 local drawer =
@@ -2402,8 +2416,7 @@ drawer.Position =
         0,
         0,
         0,
-        SPOOFER_HEADER_HEIGHT
-        + SPOOFER_GAP
+        43
     )
 
 drawer.Size =
@@ -2425,9 +2438,6 @@ drawer.ClipsDescendants =
 
 drawer.Visible =
     false
-
-drawer.ZIndex =
-    106
 
 drawer.Parent =
     spoofer
@@ -2453,6 +2463,9 @@ local activeDevice =
 local rowUpdates = {}
 
 local function refreshRows()
+    local enabled =
+        Settings.DeviceSpoofer_Enabled
+
     for _, item in ipairs(
         rowUpdates
     ) do
@@ -2469,30 +2482,50 @@ local function refreshRows()
             item[4]
 
         row.BackgroundColor3 =
-            Color3.fromRGB(
+            enabled
+            and Color3.fromRGB(
                 23,
                 23,
                 23
             )
+            or Color3.fromRGB(
+                16,
+                16,
+                16
+            )
 
         label.TextColor3 =
-            Color3.fromRGB(
+            enabled
+            and Color3.fromRGB(
                 205,
                 205,
                 205
             )
+            or Color3.fromRGB(
+                65,
+                65,
+                65
+            )
 
         dot.BackgroundColor3 =
-            activeDevice == value
-            and Color3.fromRGB(
-                0,
-                190,
-                85
+            enabled
+            and (
+                activeDevice == value
+                and Color3.fromRGB(
+                    0,
+                    190,
+                    85
+                )
+                or Color3.fromRGB(
+                    95,
+                    95,
+                    95
+                )
             )
             or Color3.fromRGB(
-                95,
-                95,
-                95
+                45,
+                45,
+                45
             )
     end
 end
@@ -2531,7 +2564,7 @@ for i, device in ipairs(
         i
 
     row.ZIndex =
-        107
+        105
 
     row.Parent =
         drawer
@@ -2566,13 +2599,6 @@ for i, device in ipairs(
     label.Text =
         device[1]
 
-    label.TextColor3 =
-        Color3.fromRGB(
-            205,
-            205,
-            205
-        )
-
     label.Font =
         Enum.Font.GothamMedium
 
@@ -2583,7 +2609,7 @@ for i, device in ipairs(
         Enum.TextXAlignment.Left
 
     label.ZIndex =
-        108
+        106
 
     label.Parent =
         row
@@ -2605,18 +2631,11 @@ for i, device in ipairs(
             -4
         )
 
-    dot.BackgroundColor3 =
-        Color3.fromRGB(
-            95,
-            95,
-            95
-        )
-
     dot.BorderSizePixel =
         0
 
     dot.ZIndex =
-        108
+        106
 
     dot.Parent =
         row
@@ -2638,6 +2657,10 @@ for i, device in ipairs(
 
     row.MouseButton1Click:Connect(
         function()
+            if not Settings.DeviceSpoofer_Enabled then
+                return
+            end
+
             if activeDevice ==
                 device[2] then
 
@@ -2646,9 +2669,6 @@ for i, device in ipairs(
 
                 Settings.DeviceSpoofer_Active =
                     nil
-
-                Settings.DeviceSpoofer_Enabled =
-                    false
 
                 if SetControlsRemote then
                     pcall(
@@ -2664,53 +2684,25 @@ for i, device in ipairs(
                 Settings.DeviceSpoofer_Active =
                     activeDevice
 
-                Settings.DeviceSpoofer_Enabled =
-                    true
-
                 spoofDevice(
                     activeDevice
                 )
             end
 
             refreshRows()
-            saveSettings(Settings)
+            saveSettings(
+                Settings
+            )
         end
     )
 end
 
 local drawerHeight =
     #devices * 32
-    + (#devices - 1) * 4
+    + (
+        #devices - 1
+    ) * 4
     + 4
-
-local collapsedSpooferHeight =
-    SPOOFER_HEADER_HEIGHT
-
-local expandedSpooferHeight =
-    SPOOFER_HEADER_HEIGHT
-    + SPOOFER_GAP
-    + drawerHeight
-
-local baseMenuHeight =
-    nil
-
-local function calculateBaseMenuHeight()
-    local total =
-        70
-        + ToggleContainer.AbsoluteSize.Y
-        + 15
-
-    if Settings.DeviceSpoofer_Expanded then
-        total =
-            total
-            - (
-                drawerHeight
-                + SPOOFER_GAP
-            )
-    end
-
-    return total
-end
 
 local function setSpooferExpanded(
     expanded,
@@ -2719,123 +2711,71 @@ local function setSpooferExpanded(
     Settings.DeviceSpoofer_Expanded =
         expanded
 
-    if not baseMenuHeight then
-        baseMenuHeight =
-            calculateBaseMenuHeight()
-    end
-
-    local targetDrawerHeight =
+    arrowButton.Text =
         expanded
-        and drawerHeight
-        or 0
-
-    local targetSpooferHeight =
-        expanded
-        and expandedSpooferHeight
-        or collapsedSpooferHeight
-
-    local targetMenuHeight =
-        baseMenuHeight
-        + (
-            expanded
-            and (
-                drawerHeight
-                + SPOOFER_GAP
-            )
-            or 0
-        )
-
-    local targetMenu =
-        UDim2.new(
-            0,
-            390,
-            0,
-            targetMenuHeight
-        )
-
-    local targetSpoofer =
-        UDim2.new(
-            1,
-            -6,
-            0,
-            targetSpooferHeight
-        )
-
-    local targetDrawer =
-        UDim2.new(
-            1,
-            0,
-            0,
-            targetDrawerHeight
-        )
-
-    local targetRotation =
-        expanded
-        and 0
-        or 90
+        and "⌄"
+        or "›"
 
     drawer.Visible =
         true
 
+    local target =
+        expanded
+        and drawerHeight
+        or 0
+
+    local tween =
+        TweenInfo.new(
+            0.2,
+            Enum.EasingStyle.Quad,
+            Enum.EasingDirection.Out
+        )
+
     if animated then
         TweenService:Create(
-            MenuFrame,
-            SPOOFER_TWEEN,
-            {
-                Size = targetMenu
-            }
-        ):Play()
-
-        TweenService:Create(
-            spoofer,
-            SPOOFER_TWEEN,
-            {
-                Size = targetSpoofer
-            }
-        ):Play()
-
-        TweenService:Create(
             drawer,
-            SPOOFER_TWEEN,
+            tween,
             {
-                Size = targetDrawer
+                Size =
+                    UDim2.new(
+                        1,
+                        0,
+                        0,
+                        target
+                    )
             }
         ):Play()
 
-        TweenService:Create(
-            spooferArrow,
-            SPOOFER_TWEEN,
-            {
-                Rotation = targetRotation
-            }
-        ):Play()
-
-        if not expanded then
-            task.delay(
-                0.3,
-                function()
-                    if not Settings.DeviceSpoofer_Expanded then
-                        drawer.Visible =
-                            false
-                    end
-                end
-            )
-        end
+        task.delay(
+            0.22,
+            function()
+                resizeMenu(false)
+            end
+        )
     else
-        MenuFrame.Size =
-            targetMenu
-
-        spoofer.Size =
-            targetSpoofer
-
         drawer.Size =
-            targetDrawer
+            UDim2.new(
+                1,
+                0,
+                0,
+                target
+            )
 
-        spooferArrow.Rotation =
-            targetRotation
+        resizeMenu(false)
+    end
 
-        drawer.Visible =
-            expanded
+    if not expanded then
+        task.delay(
+            animated
+                and 0.22
+                or 0,
+            function()
+                if not Settings.DeviceSpoofer_Expanded then
+                    drawer.Visible =
+                        false
+                end
+            end
+        )
     end
 
     if animated then
@@ -2845,7 +2785,7 @@ local function setSpooferExpanded(
     end
 end
 
-spooferHeader.MouseButton1Click:Connect(
+arrowButton.MouseButton1Click:Connect(
     function()
         setSpooferExpanded(
             not Settings.DeviceSpoofer_Expanded,
@@ -2854,27 +2794,53 @@ spooferHeader.MouseButton1Click:Connect(
     end
 )
 
-task.defer(
+enableButton.MouseButton1Click:Connect(
     function()
-        task.wait()
+        Settings.DeviceSpoofer_Enabled =
+            not Settings.DeviceSpoofer_Enabled
 
-        baseMenuHeight =
-            calculateBaseMenuHeight()
+        if not Settings.DeviceSpoofer_Enabled then
+            activeDevice =
+                nil
 
-        setSpooferExpanded(
-            false,
-            false
-        )
+            Settings.DeviceSpoofer_Active =
+                nil
+
+            if SetControlsRemote then
+                pcall(
+                    SetControlsRemote.FireServer,
+                    SetControlsRemote,
+                    "MouseKeyboard"
+                )
+            end
+        elseif not Settings.DeviceSpoofer_Expanded then
+            setSpooferExpanded(
+                true,
+                true
+            )
+        end
 
         refreshRows()
+        saveSettings(
+            Settings
+        )
     end
 )
+
+setSpooferExpanded(
+    false,
+    false
+)
+
+refreshRows()
 
 local teamCache = {}
 local teamCacheTime = {}
 local TEAM_CACHE_DURATION = 0.15
 
-local function normalizeTeamValue(value)
+local function normalizeTeamValue(
+    value
+)
     if value == nil then
         return nil
     end
@@ -2916,7 +2882,9 @@ local function normalizeTeamValue(value)
     return nil
 end
 
-local function isTeamName(name)
+local function isTeamName(
+    name
+)
     if typeof(name) ~= "string" then
         return false
     end
@@ -3060,7 +3028,9 @@ local function getRivalsTeamSignature(
     return signature
 end
 
-local function clearTeamCache(player)
+local function clearTeamCache(
+    player
+)
     teamCache[player] =
         nil
 
@@ -3130,7 +3100,9 @@ Players.PlayerRemoving:Connect(
     end
 )
 
-local function isTeammate(player)
+local function isTeammate(
+    player
+)
     if not player
         or player == LocalPlayer then
 
@@ -3292,7 +3264,8 @@ local function hasLineOfSight(
         targetPart.Position
 
     local offset =
-        targetPos - cameraPos
+        targetPos
+        - cameraPos
 
     local distance =
         offset.Magnitude
@@ -3454,6 +3427,7 @@ local function getAimTarget()
 
                     lockedTarget =
                         nil
+
                 else
                     return head
                 end
@@ -3505,13 +3479,13 @@ local function getAimTarget()
             if screenPos
                 and onScreen then
 
-                local screenDist =
+                local dist =
                     (
                         screenPos
                         - crosshair
                     ).Magnitude
 
-                if screenDist <=
+                if dist <=
                     Settings.Aimbot_FOVRadius then
 
                     if Settings.Aimbot_WallCheck
@@ -3522,11 +3496,11 @@ local function getAimTarget()
                         continue
                     end
 
-                    if screenDist <
+                    if dist <
                         bestDist then
 
                         bestDist =
-                            screenDist
+                            dist
 
                         bestPlayer =
                             player
@@ -3549,7 +3523,9 @@ local function getAimTarget()
     return nil
 end
 
-local function forceAimAtHead(head)
+local function forceAimAtHead(
+    head
+)
     if not head
         or not head.Parent
         or not Camera then
@@ -3681,7 +3657,9 @@ local function updateLockedBody()
         return
     end
 
-    forceAimAtHead(head)
+    forceAimAtHead(
+        head
+    )
 end
 
 local HITBOX_PARTS = {
@@ -3699,7 +3677,9 @@ local HITBOX_PARTS = {
     "RightLowerLeg",
 }
 
-local function getHitboxScreenBounds(part)
+local function getHitboxScreenBounds(
+    part
+)
     if not Camera
         or not part then
 
@@ -3960,7 +3940,9 @@ end
 
 local tracerLines = {}
 
-local function getTracerLine(player)
+local function getTracerLine(
+    player
+)
     if tracerLines[player] then
         return tracerLines[player]
     end
@@ -4005,7 +3987,9 @@ local function getTracerLine(player)
     return nil
 end
 
-local function removeTracerLine(player)
+local function removeTracerLine(
+    player
+)
     local line =
         tracerLines[player]
 
@@ -4028,6 +4012,7 @@ local function hideTracerLines()
     for _, line in pairs(
         tracerLines
     ) do
+
         line.Visible =
             false
     end
