@@ -1687,21 +1687,92 @@ end)
 print("Script loaded. Right Control opens menu. Cache: " .. CACHE_FILE)
 ]]
 
+-- Write script to file so the queue payload can read it cleanly — no escape nesting
+local SCRIPT_FILE = "rivals_main.lua"
+pcall(function()
+    if writefile then
+        writefile(SCRIPT_FILE, myScriptCode)
+    end
+end)
+
+-- Execute immediately
 local success, err = pcall(loadstring(myScriptCode))
 if not success then
     warn("Error executing main script: " .. tostring(err))
 end
 
+-- Queue payload reads from file and re-queues itself the same way
+-- No string.format nesting — the code lives on disk, not in an escaped string
 local queueFunc = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
 if queueFunc then
-    local queuePayload = string.format([[
+    queueFunc([[
         task.wait(2)
-        if loadstring then
-            loadstring(%q)()
+
+        local SCRIPT_FILE = "rivals_main.lua"
+
+        -- Read and execute the script from disk
+        local code = nil
+        pcall(function()
+            if isfile and isfile(SCRIPT_FILE) then
+                code = readfile(SCRIPT_FILE)
+            end
+        end)
+
+        if code and loadstring then
+            local ok, e = pcall(loadstring(code))
+            if not ok then warn("Queued exec error: " .. tostring(e)) end
+        else
+            warn("rivals_main.lua not found on teleport — script did not persist.")
         end
-    ]], myScriptCode)
-    queueFunc(queuePayload)
-    print("Queued for next server.")
+
+        -- Re-queue this exact same payload so it runs on the NEXT teleport too
+        local qf = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+        if qf then
+            qf([=[
+                task.wait(2)
+                local SCRIPT_FILE = "rivals_main.lua"
+                local code = nil
+                pcall(function()
+                    if isfile and isfile(SCRIPT_FILE) then
+                        code = readfile(SCRIPT_FILE)
+                    end
+                end)
+                if code and loadstring then
+                    local ok, e = pcall(loadstring(code))
+                    if not ok then warn("Queued exec error: " .. tostring(e)) end
+                end
+                local qf2 = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+                if qf2 then
+                    qf2(readfile("rivals_queue.lua"))
+                end
+            ]=])
+            -- Write the persistent queue payload to a file so depth-3+ teleports still work
+            pcall(function()
+                if writefile then
+                    writefile("rivals_queue.lua", [=[
+                        task.wait(2)
+                        local SCRIPT_FILE = "rivals_main.lua"
+                        local code = nil
+                        pcall(function()
+                            if isfile and isfile(SCRIPT_FILE) then
+                                code = readfile(SCRIPT_FILE)
+                            end
+                        end)
+                        if code and loadstring then
+                            local ok, e = pcall(loadstring(code))
+                            if not ok then warn("Queued exec error: " .. tostring(e)) end
+                        end
+                        local qf = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+                        if qf then
+                            qf(readfile("rivals_queue.lua"))
+                        end
+                    ]=])
+                end
+            end)
+            print("Re-queued for next server.")
+        end
+    ]])
+    print("Queued for next server. Script saved to " .. SCRIPT_FILE)
 else
     print("Warning: executor does not support queue_on_teleport.")
 end
