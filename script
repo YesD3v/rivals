@@ -1,15 +1,9 @@
+local myScriptCode = [[
 if _G.__rivals_loaded then
-    warn("rivals_main.lua already loaded — aborting duplicate execution.")
+    warn("[rivals] already running — blocked duplicate execution.")
     return
 end
 _G.__rivals_loaded = true
-
-local myScriptCode = [[
-if _G.__rivals_loaded_inner then
-    warn("rivals_main inner already loaded — aborting.")
-    return
-end
-_G.__rivals_loaded_inner = true
 
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local Players = game:GetService("Players")
@@ -1777,9 +1771,14 @@ pcall(function()
     end
 end)
 
-local success, err = pcall(loadstring(myScriptCode))
-if not success then
-    warn("Error executing main script: " .. tostring(err))
+local fn, compileErr = loadstring(myScriptCode)
+if not fn then
+    warn("[rivals] loadstring compile error: " .. tostring(compileErr))
+else
+    local success, runErr = pcall(fn)
+    if not success then
+        warn("[rivals] runtime error: " .. tostring(runErr))
+    end
 end
 
 local queueFunc = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
@@ -1794,8 +1793,13 @@ if queueFunc then
             end
         end)
         if code and loadstring then
-            local ok, e = pcall(loadstring(code))
-            if not ok then warn("Queued exec error: " .. tostring(e)) end
+            local fn, ce = loadstring(code)
+            if not fn then
+                warn("[rivals/queue] compile error: " .. tostring(ce))
+            else
+                local ok, e = pcall(fn)
+                if not ok then warn("[rivals/queue] runtime error: " .. tostring(e)) end
+            end
         else
             warn("rivals_main.lua not found on teleport — script did not persist.")
         end
@@ -1811,8 +1815,13 @@ if queueFunc then
                     end
                 end)
                 if code and loadstring then
-                    local ok, e = pcall(loadstring(code))
-                    if not ok then warn("Queued exec error: " .. tostring(e)) end
+                    local fn, ce = loadstring(code)
+                    if not fn then
+                        warn("[rivals/queue2] compile error: " .. tostring(ce))
+                    else
+                        local ok, e = pcall(fn)
+                        if not ok then warn("[rivals/queue2] runtime error: " .. tostring(e)) end
+                    end
                 end
                 local qf2 = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
                 if qf2 then
@@ -1831,8 +1840,13 @@ if queueFunc then
                             end
                         end)
                         if code and loadstring then
-                            local ok, e = pcall(loadstring(code))
-                            if not ok then warn("Queued exec error: " .. tostring(e)) end
+                            local fn, ce = loadstring(code)
+                            if not fn then
+                                warn("[rivals/queuefile] compile error: " .. tostring(ce))
+                            else
+                                local ok, e = pcall(fn)
+                                if not ok then warn("[rivals/queuefile] runtime error: " .. tostring(e)) end
+                            end
                         end
                         local qf = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
                         if qf then
