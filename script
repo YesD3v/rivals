@@ -1,4 +1,16 @@
+if _G.__rivals_loaded then
+    warn("rivals_main.lua already loaded — aborting duplicate execution.")
+    return
+end
+_G.__rivals_loaded = true
+
 local myScriptCode = [[
+if _G.__rivals_loaded_inner then
+    warn("rivals_main inner already loaded — aborting.")
+    return
+end
+_G.__rivals_loaded_inner = true
+
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -10,6 +22,8 @@ local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
+
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
 local CACHE_FILE = "rivals_settings.json"
 
@@ -78,8 +92,6 @@ end)
 local function spoofDevice(deviceValue)
     if not SetControlsRemote then return end
     pcall(function()
-        SetControlsRemote:FireServer("MouseKeyboard")
-        task.wait(0.3)
         SetControlsRemote:FireServer(deviceValue)
     end)
 end
@@ -88,7 +100,6 @@ local function reapplySpooferOnLoad()
     if Settings.DeviceSpoofer_Active then
         task.wait(1.5)
         spoofDevice(Settings.DeviceSpoofer_Active)
-        saveSettings(Settings)
     end
 end
 
@@ -138,7 +149,17 @@ local function isInActiveRound()
     return true
 end
 
+local function purgeStartupBlurs()
+    for _, v in ipairs(Lighting:GetChildren()) do
+        if v:IsA("BlurEffect") and v.Name == "StartupBlur" then
+            v:Destroy()
+        end
+    end
+end
+
 local function ShowStartup()
+    purgeStartupBlurs()
+
     local playerGui = LocalPlayer:WaitForChild("PlayerGui")
     local oldStartup = playerGui:FindFirstChild("StartupOverlay")
     if oldStartup then oldStartup:Destroy() end
@@ -193,7 +214,9 @@ local function ShowStartup()
     subtitle.Position = UDim2.new(0.5, 0, 0.55, 0)
     subtitle.Size = UDim2.new(1, -40, 0, 28)
     subtitle.BackgroundTransparency = 1
-    subtitle.Text = "Press Right Control to open the menu"
+    subtitle.Text = isMobile
+        and "Press the UI button to open the menu"
+        or  "Press Right Control to open the menu"
     subtitle.TextColor3 = Color3.fromRGB(165, 165, 165)
     subtitle.TextSize = 16
     subtitle.Font = Enum.Font.GothamMedium
@@ -219,16 +242,19 @@ local function ShowStartup()
     credit.Parent = card
 
     task.delay(3, function()
-        if not startupGui.Parent then return end
+        if not startupGui.Parent then
+            purgeStartupBlurs()
+            return
+        end
         local fade = TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        TweenService:Create(overlay, fade, { BackgroundTransparency = 1 }):Play()
-        TweenService:Create(card,    fade, { BackgroundTransparency = 1 }):Play()
-        TweenService:Create(title,   fade, { TextTransparency = 1 }):Play()
-        TweenService:Create(subtitle,fade, { TextTransparency = 1 }):Play()
-        TweenService:Create(credit,  fade, { TextTransparency = 1 }):Play()
-        TweenService:Create(line,    fade, { BackgroundTransparency = 1 }):Play()
+        TweenService:Create(overlay,   fade, { BackgroundTransparency = 1 }):Play()
+        TweenService:Create(card,      fade, { BackgroundTransparency = 1 }):Play()
+        TweenService:Create(title,     fade, { TextTransparency = 1 }):Play()
+        TweenService:Create(subtitle,  fade, { TextTransparency = 1 }):Play()
+        TweenService:Create(credit,    fade, { TextTransparency = 1 }):Play()
+        TweenService:Create(line,      fade, { BackgroundTransparency = 1 }):Play()
         task.wait(0.5)
-        if lightingBlur.Parent then lightingBlur:Destroy() end
+        purgeStartupBlurs()
         if startupGui.Parent then startupGui:Destroy() end
     end)
 end
@@ -1420,7 +1446,71 @@ local function openMenu()
 end
 
 BackgroundFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then closeMenu() end
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        closeMenu()
+    end
+end)
+
+if isMobile then
+    local mobileGui = Instance.new("ScreenGui")
+    mobileGui.Name = "MobileToggleGui"
+    mobileGui.ResetOnSpawn = false
+    mobileGui.IgnoreGuiInset = true
+    mobileGui.DisplayOrder = 1001
+    mobileGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+    local toggleBtn = Instance.new("TextButton")
+    toggleBtn.Size = UDim2.fromOffset(44, 44)
+    toggleBtn.Position = UDim2.new(1, -60, 1, -60)
+    toggleBtn.AnchorPoint = Vector2.new(1, 1)
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+    toggleBtn.BorderSizePixel = 0
+    toggleBtn.Text = "<>"
+    toggleBtn.TextColor3 = Color3.fromRGB(210, 210, 210)
+    toggleBtn.Font = Enum.Font.GothamBold
+    toggleBtn.TextSize = 14
+    toggleBtn.AutoButtonColor = false
+    toggleBtn.ZIndex = 200
+    toggleBtn.Parent = mobileGui
+
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 12)
+    btnCorner.Parent = toggleBtn
+
+    local btnStroke = Instance.new("UIStroke")
+    btnStroke.Color = Color3.fromRGB(55, 55, 55)
+    btnStroke.Thickness = 1
+    btnStroke.Transparency = 0.2
+    btnStroke.Parent = toggleBtn
+
+    toggleBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            TweenService:Create(toggleBtn,
+                TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                { BackgroundColor3 = Color3.fromRGB(35, 35, 35) }
+            ):Play()
+        end
+    end)
+    toggleBtn.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            TweenService:Create(toggleBtn,
+                TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                { BackgroundColor3 = Color3.fromRGB(18, 18, 18) }
+            ):Play()
+        end
+    end)
+
+    toggleBtn.MouseButton1Click:Connect(function()
+        if MenuFrame.Visible then closeMenu() else openMenu() end
+    end)
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.RightControl then
+        if MenuFrame.Visible then closeMenu() else openMenu() end
+    end
 end)
 
 local function removeESPObjects(character)
@@ -1626,13 +1716,6 @@ local function updateESP()
     end
 end
 
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.RightControl then
-        if MenuFrame.Visible then closeMenu() else openMenu() end
-    end
-end)
-
 task.spawn(function()
     while true do
         if AutoclickActive and not isVoteScreenActive() then
@@ -1684,10 +1767,9 @@ task.spawn(function()
     end
 end)
 
-print("Script loaded. Right Control opens menu. Cache: " .. CACHE_FILE)
+print("Script loaded. " .. (isMobile and "Tap <> button" or "Right Control") .. " opens menu. Cache: " .. CACHE_FILE)
 ]]
 
--- Write script to file so the queue payload can read it cleanly — no escape nesting
 local SCRIPT_FILE = "rivals_main.lua"
 pcall(function()
     if writefile then
@@ -1695,37 +1777,28 @@ pcall(function()
     end
 end)
 
--- Execute immediately
 local success, err = pcall(loadstring(myScriptCode))
 if not success then
     warn("Error executing main script: " .. tostring(err))
 end
 
--- Queue payload reads from file and re-queues itself the same way
--- No string.format nesting — the code lives on disk, not in an escaped string
 local queueFunc = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
 if queueFunc then
     queueFunc([[
         task.wait(2)
-
         local SCRIPT_FILE = "rivals_main.lua"
-
-        -- Read and execute the script from disk
         local code = nil
         pcall(function()
             if isfile and isfile(SCRIPT_FILE) then
                 code = readfile(SCRIPT_FILE)
             end
         end)
-
         if code and loadstring then
             local ok, e = pcall(loadstring(code))
             if not ok then warn("Queued exec error: " .. tostring(e)) end
         else
             warn("rivals_main.lua not found on teleport — script did not persist.")
         end
-
-        -- Re-queue this exact same payload so it runs on the NEXT teleport too
         local qf = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
         if qf then
             qf([=[
@@ -1746,7 +1819,6 @@ if queueFunc then
                     qf2(readfile("rivals_queue.lua"))
                 end
             ]=])
-            -- Write the persistent queue payload to a file so depth-3+ teleports still work
             pcall(function()
                 if writefile then
                     writefile("rivals_queue.lua", [=[
