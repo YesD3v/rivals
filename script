@@ -21,10 +21,6 @@ local isMobile = UserInputService.TouchEnabled and not UserInputService.Keyboard
 
 local CACHE_FILE = "rivals_settings.json"
 
--- BUG 1 FIX: ESP_BoxColor was stuffed into Settings and Color3 is NOT
--- JSON-serializable. HttpService:JSONEncode threw every save attempt,
--- pcall swallowed it silently, and settings NEVER persisted to disk.
--- Pulled out as a standalone constant; Settings is now clean JSON.
 local ESP_BOX_COLOR = Color3.fromRGB(255, 255, 255)
 
 local DefaultSettings = {
@@ -63,8 +59,6 @@ local function loadSettings()
     return t
 end
 
--- BUG 1 FIX (continued): Safety filter strips any non-serializable
--- types before encoding. Belt-and-suspenders; the real fix is above.
 local SERIALIZABLE_TYPES = { boolean=true, number=true, string=true }
 
 local function saveSettings(s)
@@ -88,8 +82,7 @@ if Settings.ESP_Tracer == nil and Settings.ESP_Snapline ~= nil then
     Settings.ESP_Tracer = Settings.ESP_Snapline
 end
 Settings.ESP_Snapline = nil
--- Triggerbot_MaxDistance is already in DefaultSettings at 1000;
--- line kept for clarity but is now harmless rather than a silent override.
+
 Settings.Triggerbot_MaxDistance = 1000
 
 local SetControlsRemote = nil
