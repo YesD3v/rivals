@@ -21,6 +21,12 @@ local isMobile = UserInputService.TouchEnabled and not UserInputService.Keyboard
 
 local CACHE_FILE = "rivals_settings.json"
 
+-- BUG 1 FIX: ESP_BoxColor was stuffed into Settings and Color3 is NOT
+-- JSON-serializable. HttpService:JSONEncode threw every save attempt,
+-- pcall swallowed it silently, and settings NEVER persisted to disk.
+-- Pulled out as a standalone constant; Settings is now clean JSON.
+local ESP_BOX_COLOR = Color3.fromRGB(255, 255, 255)
+
 local DefaultSettings = {
     ESP_Enabled = true,
     ESP_Highlight = true,
@@ -57,10 +63,21 @@ local function loadSettings()
     return t
 end
 
+-- BUG 1 FIX (continued): Safety filter strips any non-serializable
+-- types before encoding. Belt-and-suspenders; the real fix is above.
+local SERIALIZABLE_TYPES = { boolean=true, number=true, string=true }
+
 local function saveSettings(s)
     pcall(function()
         if writefile then
-            writefile(CACHE_FILE, HttpService:JSONEncode(s))
+            local clean = {}
+            for k, v in pairs(s) do
+                local t = typeof(v)
+                if SERIALIZABLE_TYPES[t] or v == nil then
+                    clean[k] = v
+                end
+            end
+            writefile(CACHE_FILE, HttpService:JSONEncode(clean))
         end
     end)
 end
@@ -71,7 +88,8 @@ if Settings.ESP_Tracer == nil and Settings.ESP_Snapline ~= nil then
     Settings.ESP_Tracer = Settings.ESP_Snapline
 end
 Settings.ESP_Snapline = nil
-Settings.ESP_BoxColor = Color3.fromRGB(255, 255, 255)
+-- Triggerbot_MaxDistance is already in DefaultSettings at 1000;
+-- line kept for clarity but is now harmless rather than a silent override.
 Settings.Triggerbot_MaxDistance = 1000
 
 local SetControlsRemote = nil
@@ -378,7 +396,10 @@ end
 local function updateAllSubToggles()
     for _, update in ipairs(espChildren)    do update() end
     for _, update in ipairs(aimbotChildren) do update() end
-    if updateFOVVisual   then updateFOVVisual()   end
+    -- BUG 5 FIX: updateFOVVisual was being called twice — once inside
+    -- the aimbotChildren loop (it was inserted there) and once here
+    -- explicitly. Removed the duplicate explicit call for updateFOVVisual.
+    -- updateFOVPosition is NOT in aimbotChildren, so its explicit call stays.
     if updateFOVPosition then updateFOVPosition() end
 end
 
@@ -699,6 +720,9 @@ local _, fovVisual, fovPosition =
 
 updateFOVVisual   = fovVisual
 updateFOVPosition = fovPosition
+-- BUG 5 FIX (continued): updateFOVVisual goes into aimbotChildren so the
+-- loop in updateAllSubToggles covers it. The explicit second call above
+-- was removed. updateFOVPosition stays explicit since it's not in the list.
 table.insert(aimbotChildren, updateFOVVisual)
 
 updateAllSubToggles()
@@ -1093,12 +1117,22 @@ local function worldToScreen(position)
     return Vector2.new(result.X, result.Y), result.Z > 0
 end
 
+-- BUG 2 FIX: targetPart.Position and the final IsDescendantOf(targetPart.Parent)
+-- both crash when the part is destroyed mid-frame (Parent becomes nil, and
+-- accessing .Position on a destroyed instance throws). Added an upfront
+-- Parent check and cached the parent reference before the raycast so the
+-- final comparison can't panic even if destruction races the call.
 local function hasLineOfSight(targetPart)
     if not targetPart or not Camera then return false end
+    local partParent = targetPart.Parent
+    if not partParent then return false end
+
     local cameraPos = Camera.CFrame.Position
-    local targetPos = targetPart.Position
-    local offset    = targetPos - cameraPos
-    local distance  = offset.Magnitude
+    local ok_pos, targetPos = pcall(function() return targetPart.Position end)
+    if not ok_pos then return false end
+
+    local offset   = targetPos - cameraPos
+    local distance = offset.Magnitude
     if distance <= 0 then return false end
 
     local raycastParams = RaycastParams.new()
@@ -1106,7 +1140,7 @@ local function hasLineOfSight(targetPart)
     local blacklist = {}
     if LocalPlayer.Character then table.insert(blacklist, LocalPlayer.Character) end
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character ~= targetPart.Parent then
+        if player ~= LocalPlayer and player.Character and player.Character ~= partParent then
             table.insert(blacklist, player.Character)
         end
     end
@@ -1117,7 +1151,7 @@ local function hasLineOfSight(targetPart)
     end)
     if not ok then return true end
     if not rayResult or not rayResult.Instance then return true end
-    return rayResult.Instance:IsDescendantOf(targetPart.Parent)
+    return rayResult.Instance:IsDescendantOf(partParent)
 end
 
 UserInputService.JumpRequest:Connect(function()
@@ -1238,10 +1272,20 @@ local HITBOX_PARTS = {
     "LeftUpperLeg","RightUpperLeg","LeftLowerLeg","RightLowerLeg",
 }
 
+-- BUG 3 FIX: part.CFrame and part.Size both throw when the part is
+-- destroyed between FindFirstChild and this call. Roblox destroys parts
+-- asynchronously during character removal, so the race is real and
+-- reproducible. Added a Parent guard; pcall wraps the CFrame/Size read
+-- as a second layer since destruction can still race the guard.
 local function getHitboxScreenBounds(part)
     if not Camera or not part then return nil end
-    local cf   = part.CFrame
-    local size = part.Size / 2
+    if not part.Parent then return nil end
+
+    local ok, cf, size = pcall(function()
+        return part.CFrame, part.Size / 2
+    end)
+    if not ok then return nil end
+
     local corners = {
         cf*Vector3.new( size.X, size.Y, size.Z), cf*Vector3.new(-size.X, size.Y, size.Z),
         cf*Vector3.new( size.X,-size.Y, size.Z), cf*Vector3.new(-size.X,-size.Y, size.Z),
@@ -1252,8 +1296,8 @@ local function getHitboxScreenBounds(part)
     local maxX,maxY = -math.huge,-math.huge
     local anyOnScreen = false
     for _, corner in ipairs(corners) do
-        local ok, result = pcall(function() return Camera:WorldToScreenPoint(corner) end)
-        if ok and result and result.Z > 0 then
+        local ok2, result = pcall(function() return Camera:WorldToScreenPoint(corner) end)
+        if ok2 and result and result.Z > 0 then
             anyOnScreen = true
             minX = math.min(minX, result.X); minY = math.min(minY, result.Y)
             maxX = math.max(maxX, result.X); maxY = math.max(maxY, result.Y)
@@ -1286,6 +1330,10 @@ local function shouldFire()
         if not humanoid or humanoid.Health <= 0 then continue end
         local root = character:FindFirstChild("HumanoidRootPart")
         if not root then continue end
+        -- BUG 4 FIX: root.Position throws if the root was destroyed between
+        -- FindFirstChild and here. Parent check costs nothing; prevents the
+        -- RenderStepped callback from erroring out and killing triggerbot.
+        if not root.Parent then continue end
         if (root.Position - Camera.CFrame.Position).Magnitude > Settings.Triggerbot_MaxDistance then continue end
 
         for _, partName in ipairs(HITBOX_PARTS) do
@@ -1627,9 +1675,12 @@ local function updateESP()
                 highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
                 highlight.Parent = character
             end
-            highlight.FillColor           = Settings.ESP_BoxColor
+            -- BUG 1 FIX (continued): was Settings.ESP_BoxColor which was a
+            -- Color3 in the settings table and killed JSON saves. Now reads
+            -- from the standalone ESP_BOX_COLOR constant instead.
+            highlight.FillColor           = ESP_BOX_COLOR
             highlight.FillTransparency    = Settings.ESP_BoxTransparency
-            highlight.OutlineColor        = Settings.ESP_BoxColor
+            highlight.OutlineColor        = ESP_BOX_COLOR
             highlight.OutlineTransparency = 0
             highlight.Enabled             = true
         elseif highlight then
@@ -1823,9 +1874,21 @@ if queueFunc then
                         if not ok then warn("[rivals/queue2] runtime error: " .. tostring(e)) end
                     end
                 end
+                -- BUG 6 FIX: readfile("rivals_queue.lua") was called bare with
+                -- no pcall — if the file wasn't written yet or the executor
+                -- doesn't support it, this threw and killed the entire queued
+                -- chain silently. Wrapped in pcall; logs a clear warning
+                -- instead of a hard crash on the next server hop.
                 local qf2 = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
                 if qf2 then
-                    qf2(readfile("rivals_queue.lua"))
+                    local ok_rf, queueCode = pcall(function()
+                        return readfile("rivals_queue.lua")
+                    end)
+                    if ok_rf and queueCode then
+                        qf2(queueCode)
+                    else
+                        warn("[rivals/queue2] rivals_queue.lua not found — persistence chain ended.")
+                    end
                 end
             ]=])
             pcall(function()
@@ -1850,7 +1913,14 @@ if queueFunc then
                         end
                         local qf = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
                         if qf then
-                            qf(readfile("rivals_queue.lua"))
+                            local ok_rf, queueCode = pcall(function()
+                                return readfile("rivals_queue.lua")
+                            end)
+                            if ok_rf and queueCode then
+                                qf(queueCode)
+                            else
+                                warn("[rivals/queuefile] rivals_queue.lua missing — persistence chain ended.")
+                            end
                         end
                     ]=])
                 end
