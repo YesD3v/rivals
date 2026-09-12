@@ -19,7 +19,19 @@ local LocalPlayer = Players.LocalPlayer
 
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
-local CACHE_FILE    = "rivals_settings.json"
+local CACHE_FOLDER = "Rivals Script by yes"
+local CACHE_FILE   = CACHE_FOLDER .. "/rivals_settings.json"
+
+pcall(function()
+    if makefolder then
+        local exists = isfolder and isfolder(CACHE_FOLDER)
+
+        if not exists then
+            makefolder(CACHE_FOLDER)
+        end
+    end
+end)
+
 local ESP_BOX_COLOR = Color3.fromRGB(255, 255, 255)
 
 local DefaultSettings = {
@@ -46,11 +58,13 @@ local function loadSettings()
         if isfile and isfile(CACHE_FILE) then
             local raw     = readfile(CACHE_FILE)
             local decoded = HttpService:JSONDecode(raw)
+
             for k, v in pairs(DefaultSettings) do
                 if decoded[k] == nil then
                     decoded[k] = v
                 end
             end
+
             return decoded
         end
     end)
@@ -60,9 +74,11 @@ local function loadSettings()
     end
 
     local t = {}
+
     for k, v in pairs(DefaultSettings) do
         t[k] = v
     end
+
     return t
 end
 
@@ -75,13 +91,28 @@ local SERIALIZABLE_TYPES = {
 local function saveSettings(s)
     pcall(function()
         if writefile then
+            pcall(function()
+                if makefolder then
+                    local exists = isfolder and isfolder(CACHE_FOLDER)
+
+                    if not exists then
+                        makefolder(CACHE_FOLDER)
+                    end
+                end
+            end)
+
             local clean = {}
+
             for k, v in pairs(s) do
                 if SERIALIZABLE_TYPES[typeof(v)] or v == nil then
                     clean[k] = v
                 end
             end
-            writefile(CACHE_FILE, HttpService:JSONEncode(clean))
+
+            writefile(
+                CACHE_FILE,
+                HttpService:JSONEncode(clean)
+            )
         end
     end)
 end
@@ -130,37 +161,44 @@ LocalPlayer.CharacterAdded:Connect(function(character)
     end)
 end)
 
-if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+if LocalPlayer.Character
+and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
     reapplySpooferOnLoad()
 end
 
 local function isVoteScreenActive()
     local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+
     if not playerGui then
         return false
     end
 
     local mainGui = playerGui:FindFirstChild("MainGUI")
+
     if not mainGui then
         return false
     end
 
     local mainFrame = mainGui:FindFirstChild("MainFrame")
+
     if not mainFrame then
         return false
     end
 
     local di1 = mainFrame:FindFirstChild("DuelInterface")
+
     if not di1 then
         return false
     end
 
     local di2 = di1:FindFirstChild("DuelInterface")
+
     if not di2 then
         return false
     end
 
     local voting = di2:FindFirstChild("Voting")
+
     if not voting then
         return false
     end
@@ -170,6 +208,7 @@ local function isVoteScreenActive()
     end
 
     local maps = voting:FindFirstChild("Maps")
+
     if not maps then
         return false
     end
@@ -179,16 +218,19 @@ local function isVoteScreenActive()
     end
 
     local mapsList = maps:FindFirstChild("MapsList")
+
     return mapsList ~= nil
 end
 
 local function isInActiveRound()
     local character = LocalPlayer.Character
+
     if not character then
         return false
     end
 
     local humanoid = character:FindFirstChildOfClass("Humanoid")
+
     if not humanoid or humanoid.Health <= 0 then
         return false
     end
@@ -227,7 +269,7 @@ local function ShowStartup()
     startupGui.ResetOnSpawn    = false
     startupGui.IgnoreGuiInset = true
     startupGui.DisplayOrder    = 1000
-    startupGui.Parent         = playerGui
+    startupGui.Parent          = playerGui
 
     local lightingBlur = Instance.new("BlurEffect")
     lightingBlur.Name = "StartupBlur"
@@ -438,8 +480,8 @@ local function killScript()
 
     pcall(function()
         if writefile then
-            writefile("rivals_main.lua", "-- killed")
-            writefile("rivals_queue.lua", "-- killed")
+            writefile(CACHE_FOLDER .. "/rivals_main.lua", "-- killed")
+            writefile(CACHE_FOLDER .. "/rivals_queue.lua", "-- killed")
         end
     end)
 
@@ -451,10 +493,34 @@ end
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name            = "MenuGUI"
 ScreenGui.ResetOnSpawn    = false
-ScreenGui.IgnoreGuiInset = true
+ScreenGui.IgnoreGuiInset  = true
 ScreenGui.ZIndexBehavior  = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder    = 999
 ScreenGui.Parent          = LocalPlayer:WaitForChild("PlayerGui")
+
+local Watermark = Instance.new("TextLabel")
+Watermark.AnchorPoint            = Vector2.new(0, 1)
+Watermark.Position               = UDim2.new(
+    0,
+    isMobile and 7 or 9,
+    1,
+    isMobile and -7 or -9
+)
+Watermark.Size                   = UDim2.fromOffset(
+    isMobile and 180 or 220,
+    isMobile and 30 or 36
+)
+Watermark.BackgroundTransparency = 1
+Watermark.Text                   = "BY YES.DEV"
+Watermark.TextColor3             = Color3.fromRGB(255, 255, 255)
+Watermark.Font                   = Enum.Font.GothamBold
+Watermark.TextSize               = isMobile and 19 or 24
+Watermark.TextXAlignment         = Enum.TextXAlignment.Left
+Watermark.TextYAlignment         = Enum.TextYAlignment.Center
+Watermark.TextStrokeTransparency = 1
+Watermark.ZIndex                 = 120
+Watermark.Visible                = false
+Watermark.Parent                 = ScreenGui
 
 local BackgroundFrame = Instance.new("Frame")
 BackgroundFrame.Size                   = UDim2.fromScale(1, 1)
@@ -507,6 +573,8 @@ MenuSubtitle.TextXAlignment         = Enum.TextXAlignment.Left
 MenuSubtitle.ZIndex                 = 102
 MenuSubtitle.Parent                 = MenuFrame
 
+local showKillConfirm
+
 local function showKillConfirm()
     local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
 
@@ -523,7 +591,7 @@ local function showKillConfirm()
     local confirmGui = Instance.new("ScreenGui")
     confirmGui.Name            = "KillConfirmGui"
     confirmGui.ResetOnSpawn    = false
-    confirmGui.IgnoreGuiInset = true
+    confirmGui.IgnoreGuiInset  = true
     confirmGui.DisplayOrder    = 2000
     confirmGui.Parent          = playerGui
 
@@ -628,7 +696,9 @@ local function showKillConfirm()
         TweenService:Create(
             cancelBtn,
             TweenInfo.new(0.1),
-            { BackgroundColor3 = Color3.fromRGB(40, 40, 40) }
+            {
+                BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            }
         ):Play()
     end)
 
@@ -636,7 +706,9 @@ local function showKillConfirm()
         TweenService:Create(
             cancelBtn,
             TweenInfo.new(0.1),
-            { BackgroundColor3 = Color3.fromRGB(28, 28, 28) }
+            {
+                BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+            }
         ):Play()
     end)
 
@@ -644,7 +716,9 @@ local function showKillConfirm()
         TweenService:Create(
             confirmBtn,
             TweenInfo.new(0.1),
-            { BackgroundColor3 = Color3.fromRGB(180, 35, 35) }
+            {
+                BackgroundColor3 = Color3.fromRGB(180, 35, 35)
+            }
         ):Play()
     end)
 
@@ -652,7 +726,9 @@ local function showKillConfirm()
         TweenService:Create(
             confirmBtn,
             TweenInfo.new(0.1),
-            { BackgroundColor3 = Color3.fromRGB(140, 28, 28) }
+            {
+                BackgroundColor3 = Color3.fromRGB(140, 28, 28)
+            }
         ):Play()
     end)
 end
@@ -703,26 +779,37 @@ local function updateKillButtonPosition()
     end
 
     KillButton.Visible = true
-    KillButton.Position = UDim2.new(1, -18, 1, -18)
+    KillButton.Position = UDim2.new(
+        1,
+        isMobile and -10 or -18,
+        1,
+        isMobile and -10 or -18
+    )
 end
 
 KillButton.MouseEnter:Connect(function()
     TweenService:Create(
         KillButton,
         TweenInfo.new(0.12, Enum.EasingStyle.Quad),
-        { BackgroundColor3 = Color3.fromRGB(60, 20, 20) }
+        {
+            BackgroundColor3 = Color3.fromRGB(60, 20, 20)
+        }
     ):Play()
 
     TweenService:Create(
         xLine1,
         TweenInfo.new(0.12, Enum.EasingStyle.Quad),
-        { BackgroundColor3 = Color3.fromRGB(255, 255, 255) }
+        {
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        }
     ):Play()
 
     TweenService:Create(
         xLine2,
         TweenInfo.new(0.12, Enum.EasingStyle.Quad),
-        { BackgroundColor3 = Color3.fromRGB(255, 255, 255) }
+        {
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        }
     ):Play()
 end)
 
@@ -730,19 +817,25 @@ KillButton.MouseLeave:Connect(function()
     TweenService:Create(
         KillButton,
         TweenInfo.new(0.12, Enum.EasingStyle.Quad),
-        { BackgroundColor3 = Color3.fromRGB(30, 30, 30) }
+        {
+            BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        }
     ):Play()
 
     TweenService:Create(
         xLine1,
         TweenInfo.new(0.12, Enum.EasingStyle.Quad),
-        { BackgroundColor3 = Color3.fromRGB(255, 255, 255) }
+        {
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        }
     ):Play()
 
     TweenService:Create(
         xLine2,
         TweenInfo.new(0.12, Enum.EasingStyle.Quad),
-        { BackgroundColor3 = Color3.fromRGB(255, 255, 255) }
+        {
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        }
     ):Play()
 end)
 
@@ -766,7 +859,8 @@ ToggleList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 ToggleList.Parent              = ToggleContainer
 
 local SYNC_DURATION = 0.22
-local SYNC_TWEEN    = TweenInfo.new(
+
+local SYNC_TWEEN = TweenInfo.new(
     SYNC_DURATION,
     Enum.EasingStyle.Quint,
     Enum.EasingDirection.Out
@@ -793,7 +887,9 @@ local function makeIndicator(parent)
     indicator.BorderSizePixel  = 0
     indicator.ZIndex           = parent.ZIndex + 1
     indicator.Parent           = parent
+
     makeCorner(indicator, 5)
+
     return indicator
 end
 
@@ -804,7 +900,13 @@ local function recalcMenuHeight()
         local h = ToggleContainer.AbsoluteSize.Y
 
         if h > 0 then
-            MenuFrame.Size = UDim2.new(0, 390, 0, 70 + h + 15)
+            MenuFrame.Size = UDim2.new(
+                0,
+                390,
+                0,
+                70 + h + 15
+            )
+
             updateKillButtonPosition()
         end
     end)
@@ -824,7 +926,12 @@ local function updateAllSubToggles()
     end
 end
 
-local function createMasterToggle(name, getState, setState, order)
+local function createMasterToggle(
+    name,
+    getState,
+    setState,
+    order
+)
     local button = Instance.new("TextButton")
     button.Size             = UDim2.new(1, -6, 0, 39)
     button.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
@@ -838,16 +945,16 @@ local function createMasterToggle(name, getState, setState, order)
     makeCorner(button, 9)
 
     local label = Instance.new("TextLabel")
-    label.Size                 = UDim2.new(1, -45, 1, 0)
-    label.Position             = UDim2.new(0, 14, 0, 0)
+    label.Size                   = UDim2.new(1, -45, 1, 0)
+    label.Position               = UDim2.new(0, 14, 0, 0)
     label.BackgroundTransparency = 1
-    label.Text                 = name
-    label.TextColor3           = Color3.fromRGB(235, 235, 235)
-    label.Font                 = Enum.Font.GothamBold
-    label.TextSize             = 15
-    label.TextXAlignment       = Enum.TextXAlignment.Left
-    label.ZIndex               = 105
-    label.Parent               = button
+    label.Text                   = name
+    label.TextColor3             = Color3.fromRGB(235, 235, 235)
+    label.Font                   = Enum.Font.GothamBold
+    label.TextSize               = 15
+    label.TextXAlignment         = Enum.TextXAlignment.Left
+    label.ZIndex                 = 105
+    label.Parent                 = button
 
     local indicator = makeIndicator(button)
 
@@ -935,16 +1042,16 @@ local function createChildToggle(
     makeCorner(button, 8)
 
     local label = Instance.new("TextLabel")
-    label.Size                 = UDim2.new(1, -42, 1, 0)
-    label.Position             = UDim2.new(0, 14, 0, 0)
+    label.Size                   = UDim2.new(1, -42, 1, 0)
+    label.Position               = UDim2.new(0, 14, 0, 0)
     label.BackgroundTransparency = 1
-    label.Text                 = name
-    label.TextColor3           = Color3.fromRGB(205, 205, 205)
-    label.Font                 = Enum.Font.GothamMedium
-    label.TextSize             = 13
-    label.TextXAlignment       = Enum.TextXAlignment.Left
-    label.ZIndex               = 106
-    label.Parent               = button
+    label.Text                   = name
+    label.TextColor3             = Color3.fromRGB(205, 205, 205)
+    label.Font                   = Enum.Font.GothamMedium
+    label.TextSize               = 13
+    label.TextXAlignment         = Enum.TextXAlignment.Left
+    label.ZIndex                 = 106
+    label.Parent                 = button
 
     local indicator = Instance.new("Frame")
     indicator.Size             = UDim2.fromOffset(8, 8)
@@ -960,17 +1067,30 @@ local function createChildToggle(
         local masterEnabled = masterGetter()
 
         if not masterEnabled then
-            button.BackgroundColor3             = Color3.fromRGB(16, 16, 16)
-            label.TextColor3                    = Color3.fromRGB(65, 65, 65)
-            indicator.BackgroundColor3          = Color3.fromRGB(45, 45, 45)
-            parentGroup.Branch.BackgroundColor3 = Color3.fromRGB(38, 38, 38)
+            button.BackgroundColor3 =
+                Color3.fromRGB(16, 16, 16)
+
+            label.TextColor3 =
+                Color3.fromRGB(65, 65, 65)
+
+            indicator.BackgroundColor3 =
+                Color3.fromRGB(45, 45, 45)
+
+            parentGroup.Branch.BackgroundColor3 =
+                Color3.fromRGB(38, 38, 38)
         else
-            button.BackgroundColor3             = Color3.fromRGB(23, 23, 23)
-            label.TextColor3                    = Color3.fromRGB(205, 205, 205)
-            indicator.BackgroundColor3          = getState()
+            button.BackgroundColor3 =
+                Color3.fromRGB(23, 23, 23)
+
+            label.TextColor3 =
+                Color3.fromRGB(205, 205, 205)
+
+            indicator.BackgroundColor3 = getState()
                 and Color3.fromRGB(0, 190, 85)
                 or Color3.fromRGB(95, 95, 95)
-            parentGroup.Branch.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+
+            parentGroup.Branch.BackgroundColor3 =
+                Color3.fromRGB(60, 60, 60)
         end
     end
 
@@ -987,12 +1107,18 @@ local function createChildToggle(
     updateVisual()
 
     toggleButtons[button] = updateVisual
+
     table.insert(list, updateVisual)
 
     return button
 end
 
-local function createChildSlider(name, getMaster, parentGroup, order)
+local function createChildSlider(
+    name,
+    getMaster,
+    parentGroup,
+    order
+)
     local wrapper = Instance.new("Frame")
     wrapper.Size                   = UDim2.new(1, 0, 0, 47)
     wrapper.BackgroundTransparency = 1
@@ -1010,7 +1136,8 @@ local function createChildSlider(name, getMaster, parentGroup, order)
     local sliderLabel = Instance.new("TextLabel")
     sliderLabel.Size                   = UDim2.new(1, 0, 0, 18)
     sliderLabel.BackgroundTransparency = 1
-    sliderLabel.Text                   = name .. ": " .. tostring(Settings.Aimbot_FOVRadius)
+    sliderLabel.Text =
+        name .. ": " .. tostring(Settings.Aimbot_FOVRadius)
     sliderLabel.TextColor3             = Color3.fromRGB(205, 205, 205)
     sliderLabel.Font                   = Enum.Font.GothamMedium
     sliderLabel.TextSize               = 13
@@ -1046,15 +1173,29 @@ local function createChildSlider(name, getMaster, parentGroup, order)
         local enabled = getMaster()
 
         if enabled then
-            sliderLabel.TextColor3        = Color3.fromRGB(205, 205, 205)
-            sliderLine.BackgroundColor3   = Color3.fromRGB(65, 65, 65)
-            sliderHandle.BackgroundColor3 = Color3.fromRGB(175, 175, 175)
-            parentGroup.Branch.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            sliderLabel.TextColor3 =
+                Color3.fromRGB(205, 205, 205)
+
+            sliderLine.BackgroundColor3 =
+                Color3.fromRGB(65, 65, 65)
+
+            sliderHandle.BackgroundColor3 =
+                Color3.fromRGB(175, 175, 175)
+
+            parentGroup.Branch.BackgroundColor3 =
+                Color3.fromRGB(60, 60, 60)
         else
-            sliderLabel.TextColor3        = Color3.fromRGB(65, 65, 65)
-            sliderLine.BackgroundColor3   = Color3.fromRGB(35, 35, 35)
-            sliderHandle.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-            parentGroup.Branch.BackgroundColor3 = Color3.fromRGB(38, 38, 38)
+            sliderLabel.TextColor3 =
+                Color3.fromRGB(65, 65, 65)
+
+            sliderLine.BackgroundColor3 =
+                Color3.fromRGB(35, 35, 35)
+
+            sliderHandle.BackgroundColor3 =
+                Color3.fromRGB(45, 45, 45)
+
+            parentGroup.Branch.BackgroundColor3 =
+                Color3.fromRGB(38, 38, 38)
         end
     end
 
@@ -1076,7 +1217,8 @@ local function createChildSlider(name, getMaster, parentGroup, order)
             )
         end
 
-        sliderLabel.Text = name .. ": " .. tostring(Settings.Aimbot_FOVRadius)
+        sliderLabel.Text =
+            name .. ": " .. tostring(Settings.Aimbot_FOVRadius)
     end
 
     sliderHandle.InputBegan:Connect(function(input)
@@ -1110,7 +1252,8 @@ local function createChildSlider(name, getMaster, parentGroup, order)
                     lineWidth
                 )
 
-                local rawValue = (relative / lineWidth) * 500
+                local rawValue =
+                    (relative / lineWidth) * 500
 
                 local snappedValue =
                     math.floor((rawValue + 2.5) / 5) * 5
@@ -1122,10 +1265,16 @@ local function createChildSlider(name, getMaster, parentGroup, order)
                 )
 
                 sliderLabel.Text =
-                    name .. ": " .. tostring(Settings.Aimbot_FOVRadius)
+                    name .. ": "
+                    .. tostring(Settings.Aimbot_FOVRadius)
 
                 sliderHandle.Position =
-                    UDim2.new(0, relative - 8, 0, 23)
+                    UDim2.new(
+                        0,
+                        relative - 8,
+                        0,
+                        23
+                    )
 
                 saveSettings(Settings)
             end
@@ -1383,14 +1532,14 @@ arrowLabel.ZIndex                 = 106
 arrowLabel.Parent                 = spooferHeader
 
 local spooferDrawer = Instance.new("Frame")
-spooferDrawer.Size             = UDim2.new(1, 0, 0, 0)
+spooferDrawer.Size                   = UDim2.new(1, 0, 0, 0)
 spooferDrawer.BackgroundTransparency = 1
-spooferDrawer.BorderSizePixel  = 0
-spooferDrawer.ClipsDescendants = true
-spooferDrawer.AutomaticSize    = Enum.AutomaticSize.None
-spooferDrawer.LayoutOrder      = 2
-spooferDrawer.ZIndex           = 103
-spooferDrawer.Parent           = spooferWrapper
+spooferDrawer.BorderSizePixel        = 0
+spooferDrawer.ClipsDescendants       = true
+spooferDrawer.AutomaticSize          = Enum.AutomaticSize.None
+spooferDrawer.LayoutOrder            = 2
+spooferDrawer.ZIndex                 = 103
+spooferDrawer.Parent                 = spooferWrapper
 
 local drawerInner = Instance.new("Frame")
 drawerInner.Size                   = UDim2.new(1, 0, 0, 0)
@@ -1413,7 +1562,11 @@ local function refreshDeviceDots()
     end
 end
 
-local function createDeviceRow(deviceLabel, deviceValue, rowOrder)
+local function createDeviceRow(
+    deviceLabel,
+    deviceValue,
+    rowOrder
+)
     local row = Instance.new("TextButton")
     row.Size             = UDim2.new(1, -8, 0, DRAWER_ROW_H)
     row.BackgroundColor3 = Color3.fromRGB(23, 23, 23)
@@ -1427,16 +1580,16 @@ local function createDeviceRow(deviceLabel, deviceValue, rowOrder)
     makeCorner(row, 8)
 
     local lbl = Instance.new("TextLabel")
-    lbl.Size                 = UDim2.new(1, -42, 1, 0)
-    lbl.Position             = UDim2.new(0, 14, 0, 0)
+    lbl.Size                   = UDim2.new(1, -42, 1, 0)
+    lbl.Position               = UDim2.new(0, 14, 0, 0)
     lbl.BackgroundTransparency = 1
-    lbl.Text                 = deviceLabel
-    lbl.TextColor3           = Color3.fromRGB(205, 205, 205)
-    lbl.Font                 = Enum.Font.GothamMedium
-    lbl.TextSize             = 13
-    lbl.TextXAlignment       = Enum.TextXAlignment.Left
-    lbl.ZIndex               = 106
-    lbl.Parent               = row
+    lbl.Text                   = deviceLabel
+    lbl.TextColor3             = Color3.fromRGB(205, 205, 205)
+    lbl.Font                   = Enum.Font.GothamMedium
+    lbl.TextSize               = 13
+    lbl.TextXAlignment         = Enum.TextXAlignment.Left
+    lbl.ZIndex                 = 106
+    lbl.Parent                 = row
 
     local dot = Instance.new("Frame")
     dot.Size            = UDim2.fromOffset(8, 8)
@@ -1475,11 +1628,16 @@ local function createDeviceRow(deviceLabel, deviceValue, rowOrder)
     end)
 
     updateVisual()
+
     table.insert(deviceDotUpdaters, updateVisual)
 end
 
 for i, device in ipairs(SPOOFER_DEVICES) do
-    createDeviceRow(device.label, device.value, i)
+    createDeviceRow(
+        device.label,
+        device.value,
+        i
+    )
 end
 
 local drawerAnimating = false
@@ -1488,13 +1646,18 @@ local function getContainerHeightWith(extraH)
     local baseH = 0
 
     for _, child in ipairs(ToggleContainer:GetChildren()) do
-        if (child:IsA("Frame") or child:IsA("TextButton"))
+        if (
+            child:IsA("Frame")
+            or child:IsA("TextButton")
+        )
         and child ~= spooferWrapper then
             baseH = baseH + child.AbsoluteSize.Y + 5
         end
     end
 
-    return baseH + spooferHeader.AbsoluteSize.Y + extraH
+    return baseH
+        + spooferHeader.AbsoluteSize.Y
+        + extraH
 end
 
 local function openDrawer()
@@ -1506,13 +1669,21 @@ local function openDrawer()
     spooferDrawer.Visible = true
 
     local drawerH = drawerTargetHeight()
-    local menuH   = 70 + getContainerHeightWith(drawerH) + 15
+    local menuH   =
+        70
+        + getContainerHeightWith(drawerH)
+        + 15
 
     TweenService:Create(
         spooferDrawer,
         SYNC_TWEEN,
         {
-            Size = UDim2.new(1, 0, 0, drawerH)
+            Size = UDim2.new(
+                1,
+                0,
+                0,
+                drawerH
+            )
         }
     ):Play()
 
@@ -1520,7 +1691,12 @@ local function openDrawer()
         MenuFrame,
         SYNC_TWEEN,
         {
-            Size = UDim2.new(0, 390, 0, menuH)
+            Size = UDim2.new(
+                0,
+                390,
+                0,
+                menuH
+            )
         }
     ):Play()
 
@@ -1545,13 +1721,21 @@ local function closeDrawer()
 
     drawerAnimating = true
 
-    local menuH = 70 + getContainerHeightWith(0) + 15
+    local menuH =
+        70
+        + getContainerHeightWith(0)
+        + 15
 
     TweenService:Create(
         spooferDrawer,
         SYNC_TWEEN,
         {
-            Size = UDim2.new(1, 0, 0, 0)
+            Size = UDim2.new(
+                1,
+                0,
+                0,
+                0
+            )
         }
     ):Play()
 
@@ -1559,7 +1743,12 @@ local function closeDrawer()
         MenuFrame,
         SYNC_TWEEN,
         {
-            Size = UDim2.new(0, 390, 0, menuH)
+            Size = UDim2.new(
+                0,
+                390,
+                0,
+                menuH
+            )
         }
     ):Play()
 
@@ -1594,7 +1783,13 @@ task.defer(function()
     local h = ToggleContainer.AbsoluteSize.Y
 
     if h > 0 then
-        MenuFrame.Size = UDim2.new(0, 390, 0, 70 + h + 15)
+        MenuFrame.Size = UDim2.new(
+            0,
+            390,
+            0,
+            70 + h + 15
+        )
+
         updateKillButtonPosition()
     end
 end)
@@ -1628,7 +1823,9 @@ local function normalizeTeamValue(value)
     end
 
     if valueType == "string" then
-        return value == "" and nil or "string:" .. value
+        return value == ""
+            and nil
+            or "string:" .. value
     end
 
     if valueType == "number" then
@@ -1659,7 +1856,12 @@ local function isTeamName(name)
         or lowered == "teamindex"
         or lowered == "teamcolor"
         or lowered == "teamcolour"
-        or string.find(lowered, "teamid", 1, true) ~= nil
+        or string.find(
+            lowered,
+            "teamid",
+            1,
+            true
+        ) ~= nil
 end
 
 local function getTeamFromAttributes(container)
@@ -1723,15 +1925,23 @@ local function getRivalsTeamSignature(player)
 
     if teamCache[player] ~= nil
     and teamCacheTime[player]
-    and now - teamCacheTime[player] < TEAM_CACHE_DURATION then
+    and now - teamCacheTime[player]
+        < TEAM_CACHE_DURATION then
         return teamCache[player]
     end
 
-    local signature = player.Team
+    local signature =
+        player.Team
         or getTeamFromAttributes(player)
         or getTeamFromValues(player)
-        or (player.Character and getTeamFromAttributes(player.Character))
-        or (player.Character and getTeamFromValues(player.Character))
+        or (
+            player.Character
+            and getTeamFromAttributes(player.Character)
+        )
+        or (
+            player.Character
+            and getTeamFromValues(player.Character)
+        )
 
     if not signature then
         local ok, tc = pcall(function()
@@ -1741,7 +1951,8 @@ local function getRivalsTeamSignature(player)
         if ok and tc then
             local colorName = tc.Name
 
-            if colorName and colorName ~= "Medium stone grey" then
+            if colorName
+            and colorName ~= "Medium stone grey" then
                 signature = "brick:" .. colorName
             end
         end
@@ -1761,32 +1972,52 @@ end
 trackConn(Players.PlayerAdded:Connect(function(player)
     clearTeamCache(player)
 
-    trackConn(player:GetPropertyChangedSignal("Team"):Connect(function()
-        clearTeamCache(player)
-    end))
+    trackConn(
+        player:GetPropertyChangedSignal("Team"):Connect(
+            function()
+                clearTeamCache(player)
+            end
+        )
+    )
 
-    trackConn(player:GetPropertyChangedSignal("TeamColor"):Connect(function()
-        clearTeamCache(player)
-    end))
+    trackConn(
+        player:GetPropertyChangedSignal("TeamColor"):Connect(
+            function()
+                clearTeamCache(player)
+            end
+        )
+    )
 
-    trackConn(player.CharacterAdded:Connect(function()
-        clearTeamCache(player)
-    end))
+    trackConn(
+        player.CharacterAdded:Connect(function()
+            clearTeamCache(player)
+        end)
+    )
 end))
 
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then
-        trackConn(player:GetPropertyChangedSignal("Team"):Connect(function()
-            clearTeamCache(player)
-        end))
+        trackConn(
+            player:GetPropertyChangedSignal("Team"):Connect(
+                function()
+                    clearTeamCache(player)
+                end
+            )
+        )
 
-        trackConn(player:GetPropertyChangedSignal("TeamColor"):Connect(function()
-            clearTeamCache(player)
-        end))
+        trackConn(
+            player:GetPropertyChangedSignal("TeamColor"):Connect(
+                function()
+                    clearTeamCache(player)
+                end
+            )
+        )
 
-        trackConn(player.CharacterAdded:Connect(function()
-            clearTeamCache(player)
-        end))
+        trackConn(
+            player.CharacterAdded:Connect(function()
+                clearTeamCache(player)
+            end)
+        )
     end
 end
 
@@ -1901,7 +2132,8 @@ local function getCrosshairPosition()
         return Vector2.new(0, 0)
     end
 
-    if UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter then
+    if UserInputService.MouseBehavior
+        == Enum.MouseBehavior.LockCenter then
         local vp = Camera.ViewportSize
 
         return Vector2.new(
@@ -1926,11 +2158,15 @@ local function worldToScreen(position)
         return nil, false
     end
 
-    return Vector2.new(result.X, result.Y), result.Z > 0
+    return Vector2.new(
+        result.X,
+        result.Y
+    ), result.Z > 0
 end
 
 local sharedRaycastParams = RaycastParams.new()
-sharedRaycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+sharedRaycastParams.FilterType =
+    Enum.RaycastFilterType.Blacklist
 
 local raycastBlacklistTime = 0
 
@@ -1942,18 +2178,26 @@ local function getSharedRaycastParams(targetCharacter)
         local blacklist = {}
 
         if LocalPlayer.Character then
-            table.insert(blacklist, LocalPlayer.Character)
+            table.insert(
+                blacklist,
+                LocalPlayer.Character
+            )
         end
 
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer
             and player.Character
             and player.Character ~= targetCharacter then
-                table.insert(blacklist, player.Character)
+                table.insert(
+                    blacklist,
+                    player.Character
+                )
             end
         end
 
-        sharedRaycastParams.FilterDescendantsInstances = blacklist
+        sharedRaycastParams.FilterDescendantsInstances =
+            blacklist
+
         raycastBlacklistDirty = false
         raycastBlacklistTime  = now
     end
@@ -1989,7 +2233,8 @@ local function hasLineOfSight(targetPart)
         return false
     end
 
-    local params = getSharedRaycastParams(partParent)
+    local params =
+        getSharedRaycastParams(partParent)
 
     local ok, rayResult = pcall(function()
         return workspace:Raycast(
@@ -2003,11 +2248,14 @@ local function hasLineOfSight(targetPart)
         return true
     end
 
-    if not rayResult or not rayResult.Instance then
+    if not rayResult
+    or not rayResult.Instance then
         return true
     end
 
-    return rayResult.Instance:IsDescendantOf(partParent)
+    return rayResult.Instance:IsDescendantOf(
+        partParent
+    )
 end
 
 trackConn(UserInputService.JumpRequest:Connect(function()
@@ -2050,13 +2298,20 @@ local function getAimTarget()
         else
             local character = lockedTarget.Character
             local head =
-                character and character:FindFirstChild("Head")
+                character
+                and character:FindFirstChild("Head")
             local humanoid =
-                character and character:FindFirstChildOfClass("Humanoid")
+                character
+                and character:FindFirstChildOfClass("Humanoid")
 
-            if head and humanoid and humanoid.Health > 0 then
+            if head
+            and humanoid
+            and humanoid.Health > 0 then
                 local dist =
-                    (localRoot.Position - head.Position).Magnitude
+                    (
+                        localRoot.Position
+                        - head.Position
+                    ).Magnitude
 
                 if dist > Settings.Triggerbot_MaxDistance then
                     lockedTarget = nil
@@ -2089,7 +2344,10 @@ local function getAimTarget()
         end
 
         local dist3d =
-            (localRoot.Position - head.Position).Magnitude
+            (
+                localRoot.Position
+                - head.Position
+            ).Magnitude
 
         if dist3d > Settings.Triggerbot_MaxDistance then
             continue
@@ -2126,7 +2384,9 @@ local function getAimTarget()
 end
 
 local function forceAimAtHead(head)
-    if not head or not head.Parent or not Camera then
+    if not head
+    or not head.Parent
+    or not Camera then
         return false
     end
 
@@ -2163,7 +2423,11 @@ local function forceAimAtHead(head)
 
     rootPart.CFrame = CFrame.lookAt(
         rootPos,
-        Vector3.new(headPos.X, rootPos.Y, headPos.Z),
+        Vector3.new(
+            headPos.X,
+            rootPos.Y,
+            headPos.Z
+        ),
         Vector3.new(0, 1, 0)
     )
 
@@ -2171,7 +2435,8 @@ local function forceAimAtHead(head)
 end
 
 local function updateLockedBody()
-    if not Settings.Aimbot_Enabled or not lockedTarget then
+    if not Settings.Aimbot_Enabled
+    or not lockedTarget then
         return
     end
 
@@ -2181,10 +2446,14 @@ local function updateLockedBody()
     end
 
     local character = lockedTarget.Character
+
     local head =
-        character and character:FindFirstChild("Head")
+        character
+        and character:FindFirstChild("Head")
+
     local humanoid =
-        character and character:FindFirstChildOfClass("Humanoid")
+        character
+        and character:FindFirstChildOfClass("Humanoid")
 
     if not character
     or not head
@@ -2206,8 +2475,9 @@ local function updateLockedBody()
             end)
 
             if ok
-            and (localRoot.Position - headPos).Magnitude
-                > Settings.Triggerbot_MaxDistance then
+            and (
+                localRoot.Position - headPos
+            ).Magnitude > Settings.Triggerbot_MaxDistance then
                 lockedTarget = nil
                 return
             end
@@ -2239,19 +2509,27 @@ local HITBOX_PARTS = {
 }
 
 local function getHitboxScreenBounds(part)
-    if not Camera or not part or not part.Parent then
+    if not Camera
+    or not part
+    or not part.Parent then
         return nil
     end
 
     local ok, cf, size = pcall(function()
-        return part.CFrame, part.Size * 0.5
+        return part.CFrame,
+            part.Size * 0.5
     end)
 
-    if not ok or not cf or not size then
+    if not ok
+    or not cf
+    or not size then
         return nil
     end
 
-    local sx, sy, sz = size.X, size.Y, size.Z
+    local sx, sy, sz =
+        size.X,
+        size.Y,
+        size.Z
 
     local corners = {
         cf * Vector3.new( sx,  sy,  sz),
@@ -2264,8 +2542,14 @@ local function getHitboxScreenBounds(part)
         cf * Vector3.new(-sx, -sy, -sz),
     }
 
-    local minX, minY = math.huge, math.huge
-    local maxX, maxY = -math.huge, -math.huge
+    local minX, minY =
+        math.huge,
+        math.huge
+
+    local maxX, maxY =
+        -math.huge,
+        -math.huge
+
     local anyOnScreen = false
 
     for _, corner in ipairs(corners) do
@@ -2273,7 +2557,9 @@ local function getHitboxScreenBounds(part)
             return Camera:WorldToScreenPoint(corner)
         end)
 
-        if ok2 and result and result.Z > 0 then
+        if ok2
+        and result
+        and result.Z > 0 then
             anyOnScreen = true
 
             if result.X < minX then
@@ -2298,7 +2584,10 @@ local function getHitboxScreenBounds(part)
         return nil
     end
 
-    return minX, minY, maxX, maxY
+    return minX,
+        minY,
+        maxX,
+        maxY
 end
 
 local function shouldFire()
@@ -2314,12 +2603,18 @@ local function shouldFire()
     and lockedTarget
     and isEnemy(lockedTarget) then
         local character = lockedTarget.Character
-        local head =
-            character and character:FindFirstChild("Head")
-        local humanoid =
-            character and character:FindFirstChildOfClass("Humanoid")
 
-        if head and humanoid and humanoid.Health > 0 then
+        local head =
+            character
+            and character:FindFirstChild("Head")
+
+        local humanoid =
+            character
+            and character:FindFirstChildOfClass("Humanoid")
+
+        if head
+        and humanoid
+        and humanoid.Health > 0 then
             local los = hasLineOfSight(head)
 
             if los then
@@ -2341,8 +2636,13 @@ local function shouldFire()
     end
 
     local crosshair = getCrosshairPosition()
-    local cx, cy    = crosshair.X, crosshair.Y
-    local camPos    = Camera.CFrame.Position
+
+    local cx, cy =
+        crosshair.X,
+        crosshair.Y
+
+    local camPos =
+        Camera.CFrame.Position
 
     for _, player in ipairs(getEnemies()) do
         local character = player.Character
@@ -2354,14 +2654,16 @@ local function shouldFire()
         local humanoid =
             character:FindFirstChildOfClass("Humanoid")
 
-        if not humanoid or humanoid.Health <= 0 then
+        if not humanoid
+        or humanoid.Health <= 0 then
             continue
         end
 
         local root =
             character:FindFirstChild("HumanoidRootPart")
 
-        if not root or not root.Parent then
+        if not root
+        or not root.Parent then
             continue
         end
 
@@ -2373,20 +2675,25 @@ local function shouldFire()
             continue
         end
 
-        if (rootPos - camPos).Magnitude
-            > Settings.Triggerbot_MaxDistance then
+        if (
+            rootPos - camPos
+        ).Magnitude > Settings.Triggerbot_MaxDistance then
             continue
         end
 
         for _, partName in ipairs(HITBOX_PARTS) do
-            local part = character:FindFirstChild(partName)
+            local part =
+                character:FindFirstChild(partName)
 
             if part then
                 if not hasLineOfSight(part) then
                     continue
                 end
 
-                local minX, minY, maxX, maxY =
+                local minX,
+                    minY,
+                    maxX,
+                    maxY =
                     getHitboxScreenBounds(part)
 
                 if minX
@@ -2468,7 +2775,9 @@ local function updateTracer()
 
     local localRoot =
         localCharacter
-        and localCharacter:FindFirstChild("HumanoidRootPart")
+        and localCharacter:FindFirstChild(
+            "HumanoidRootPart"
+        )
 
     if not localRoot or not Camera then
         hideTracerLines()
@@ -2476,8 +2785,12 @@ local function updateTracer()
     end
 
     local vp     = Camera.ViewportSize
-    local origin = Vector2.new(vp.X / 2, vp.Y / 2)
-    local seen   = {}
+    local origin = Vector2.new(
+        vp.X / 2,
+        vp.Y / 2
+    )
+
+    local seen = {}
 
     for _, player in ipairs(getEnemies()) do
         local character = player.Character
@@ -2488,32 +2801,47 @@ local function updateTracer()
 
         local root =
             character
-            and character:FindFirstChild("HumanoidRootPart")
+            and character:FindFirstChild(
+                "HumanoidRootPart"
+            )
 
-        if humanoid and humanoid.Health > 0 and root then
+        if humanoid
+        and humanoid.Health > 0
+        and root then
             local ok_rp, rootPos = pcall(function()
                 return root.Position
             end)
 
             if ok_rp
-            and (rootPos - localRoot.Position).Magnitude <= 1000 then
-                local head = character:FindFirstChild("Head")
+            and (
+                rootPos - localRoot.Position
+            ).Magnitude <= 1000 then
+                local head =
+                    character:FindFirstChild("Head")
 
                 local ok_hp, targetPos = pcall(function()
-                    return head and head.Position or root.Position
+                    return head
+                        and head.Position
+                        or root.Position
                 end)
 
                 if ok_hp then
                     local ok_sp, sp = pcall(function()
-                        return Camera:WorldToViewportPoint(targetPos)
+                        return Camera:WorldToViewportPoint(
+                            targetPos
+                        )
                     end)
 
                     if ok_sp and sp.Z > 0 then
-                        local line = getTracerLine(player)
+                        local line =
+                            getTracerLine(player)
 
                         if line then
                             line.From    = origin
-                            line.To      = Vector2.new(sp.X, sp.Y)
+                            line.To      = Vector2.new(
+                                sp.X,
+                                sp.Y
+                            )
                             line.Visible = true
                             seen[player] = true
                         end
@@ -2534,11 +2862,14 @@ end
 
 pcall(function()
     if Drawing then
-        circleDraw           = Drawing.new("Circle")
+        circleDraw =
+            Drawing.new("Circle")
+
         circleDraw.Thickness = 2
-        circleDraw.Color     = Color3.fromRGB(255, 0, 0)
-        circleDraw.Filled    = false
-        circleDraw.Visible   = false
+        circleDraw.Color =
+            Color3.fromRGB(255, 0, 0)
+        circleDraw.Filled = false
+        circleDraw.Visible = false
     end
 end)
 
@@ -2547,10 +2878,15 @@ local function updateCircle()
         return
     end
 
-    if Settings.Aimbot_Enabled and not MenuFrame.Visible then
-        circleDraw.Position = getCrosshairPosition()
-        circleDraw.Radius   = Settings.Aimbot_FOVRadius
-        circleDraw.Visible  = true
+    if Settings.Aimbot_Enabled
+    and not MenuFrame.Visible then
+        circleDraw.Position =
+            getCrosshairPosition()
+
+        circleDraw.Radius =
+            Settings.Aimbot_FOVRadius
+
+        circleDraw.Visible = true
     else
         circleDraw.Visible = false
     end
@@ -2594,6 +2930,7 @@ local function closeMenu()
     MenuFrame.Visible       = false
     BackgroundFrame.Visible = false
     KillButton.Visible      = false
+    Watermark.Visible       = false
     AutoclickActive         = false
 
     releaseTab()
@@ -2606,6 +2943,7 @@ local function openMenu()
 
     MenuFrame.Visible       = true
     BackgroundFrame.Visible = true
+    Watermark.Visible       = true
     lockedTarget            = nil
     AutoclickActive         = false
 
@@ -2617,68 +2955,78 @@ local function openMenu()
     task.defer(updateKillButtonPosition)
 end
 
-trackConn(UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if input.KeyCode == Enum.KeyCode.RightControl then
-        if MenuFrame.Visible then
-            closeMenu()
-        else
-            openMenu()
+trackConn(UserInputService.InputBegan:Connect(
+    function(input, gameProcessed)
+        if input.KeyCode
+            == Enum.KeyCode.RightControl then
+            if MenuFrame.Visible then
+                closeMenu()
+            else
+                openMenu()
+            end
+
+            return
         end
 
-        return
+        if not MenuFrame.Visible then
+            return
+        end
+
+        if input.UserInputType
+            ~= Enum.UserInputType.MouseButton1
+        and input.UserInputType
+            ~= Enum.UserInputType.Touch then
+            return
+        end
+
+        local mfPos  = MenuFrame.AbsolutePosition
+        local mfSize = MenuFrame.AbsoluteSize
+
+        local clickX = input.Position.X
+        local clickY = input.Position.Y
+
+        local insideMenu =
+            clickX >= mfPos.X
+            and clickX <= mfPos.X + mfSize.X
+            and clickY >= mfPos.Y
+            and clickY <= mfPos.Y + mfSize.Y
+
+        local kbPos  = KillButton.AbsolutePosition
+        local kbSize = KillButton.AbsoluteSize
+
+        local insideKill =
+            clickX >= kbPos.X
+            and clickX <= kbPos.X + kbSize.X
+            and clickY >= kbPos.Y
+            and clickY <= kbPos.Y + kbSize.Y
+
+        if not insideMenu
+        and not insideKill then
+            closeMenu()
+        end
     end
-
-    if not MenuFrame.Visible then
-        return
-    end
-
-    if input.UserInputType ~= Enum.UserInputType.MouseButton1
-    and input.UserInputType ~= Enum.UserInputType.Touch then
-        return
-    end
-
-    local mfPos  = MenuFrame.AbsolutePosition
-    local mfSize = MenuFrame.AbsoluteSize
-
-    local clickX = input.Position.X
-    local clickY = input.Position.Y
-
-    local insideMenu =
-        clickX >= mfPos.X
-        and clickX <= mfPos.X + mfSize.X
-        and clickY >= mfPos.Y
-        and clickY <= mfPos.Y + mfSize.Y
-
-    local kbPos  = KillButton.AbsolutePosition
-    local kbSize = KillButton.AbsoluteSize
-
-    local insideKill =
-        clickX >= kbPos.X
-        and clickX <= kbPos.X + kbSize.X
-        and clickY >= kbPos.Y
-        and clickY <= kbPos.Y + kbSize.Y
-
-    if not insideMenu and not insideKill then
-        closeMenu()
-    end
-end))
+))
 
 if isMobile then
     local mobileGui = Instance.new("ScreenGui")
     mobileGui.Name            = "MobileToggleGui"
     mobileGui.ResetOnSpawn    = false
-    mobileGui.IgnoreGuiInset = true
+    mobileGui.IgnoreGuiInset  = true
     mobileGui.DisplayOrder    = 1001
-    mobileGui.Parent          = LocalPlayer:WaitForChild("PlayerGui")
+    mobileGui.Parent          =
+        LocalPlayer:WaitForChild("PlayerGui")
 
     local toggleBtn = Instance.new("TextButton")
     toggleBtn.Size             = UDim2.fromOffset(44, 44)
-    toggleBtn.Position         = UDim2.new(1, -60, 1, -60)
+    toggleBtn.Position         =
+        UDim2.new(1, -60, 1, -60)
     toggleBtn.AnchorPoint      = Vector2.new(1, 1)
-    toggleBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+    toggleBtn.BackgroundColor3 =
+        Color3.fromRGB(18, 18, 18)
     toggleBtn.BorderSizePixel  = 0
     toggleBtn.Text             = "<>"
-    toggleBtn.TextColor3       = Color3.fromRGB(210, 210, 210)
+    toggleBtn.TextColor3       =
+        Color3.fromRGB(210, 210, 210)
     toggleBtn.Font             = Enum.Font.GothamBold
     toggleBtn.TextSize         = 14
     toggleBtn.AutoButtonColor  = false
@@ -2694,7 +3042,8 @@ if isMobile then
     btnStroke.Parent       = toggleBtn
 
     toggleBtn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType
+            == Enum.UserInputType.Touch then
             TweenService:Create(
                 toggleBtn,
                 TweenInfo.new(
@@ -2703,14 +3052,16 @@ if isMobile then
                     Enum.EasingDirection.Out
                 ),
                 {
-                    BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+                    BackgroundColor3 =
+                        Color3.fromRGB(35, 35, 35)
                 }
             ):Play()
         end
     end)
 
     toggleBtn.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType
+            == Enum.UserInputType.Touch then
             TweenService:Create(
                 toggleBtn,
                 TweenInfo.new(
@@ -2719,7 +3070,8 @@ if isMobile then
                     Enum.EasingDirection.Out
                 ),
                 {
-                    BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+                    BackgroundColor3 =
+                        Color3.fromRGB(18, 18, 18)
                 }
             ):Play()
         end
@@ -2746,7 +3098,8 @@ local function removeESPObjects(character)
         "HealthBackground",
         "HealthOutline"
     }) do
-        local obj = character:FindFirstChild(name)
+        local obj =
+            character:FindFirstChild(name)
 
         if obj then
             obj:Destroy()
@@ -2759,22 +3112,45 @@ local ESP_GUI_HEIGHT    = 58
 local HEALTH_BAR_WIDTH  = 120
 local HEALTH_BAR_HEIGHT = 7
 
-local function createESPBillboard(character, head)
+local function createESPBillboard(
+    character,
+    head
+)
     local billboard = Instance.new("BillboardGui")
-    billboard.Name                  = "ESP_Billboard"
-    billboard.Adornee               = head
-    billboard.AlwaysOnTop           = true
-    billboard.LightInfluence        = 0
-    billboard.MaxDistance           = Settings.ESP_MaxDistance
-    billboard.Size                  = UDim2.fromOffset(
-        ESP_GUI_WIDTH,
-        ESP_GUI_HEIGHT
-    )
-    billboard.StudsOffsetWorldSpace = Vector3.new(0, 2.7, 0)
-    billboard.ClipsDescendants      = false
-    billboard.Parent                = character
 
-    local healthOutline = Instance.new("Frame")
+    billboard.Name =
+        "ESP_Billboard"
+
+    billboard.Adornee =
+        head
+
+    billboard.AlwaysOnTop =
+        true
+
+    billboard.LightInfluence =
+        0
+
+    billboard.MaxDistance =
+        Settings.ESP_MaxDistance
+
+    billboard.Size =
+        UDim2.fromOffset(
+            ESP_GUI_WIDTH,
+            ESP_GUI_HEIGHT
+        )
+
+    billboard.StudsOffsetWorldSpace =
+        Vector3.new(0, 2.7, 0)
+
+    billboard.ClipsDescendants =
+        false
+
+    billboard.Parent =
+        character
+
+    local healthOutline =
+        Instance.new("Frame")
+
     healthOutline.Name =
         "HealthOutline"
 
@@ -2793,14 +3169,26 @@ local function createESPBillboard(character, head)
     healthOutline.BackgroundColor3 =
         Color3.fromRGB(0, 0, 0)
 
-    healthOutline.BackgroundTransparency = 0.15
-    healthOutline.BorderSizePixel        = 0
-    healthOutline.ZIndex                 = 5
-    healthOutline.Parent                 = billboard
+    healthOutline.BackgroundTransparency =
+        0.15
 
-    makeCorner(healthOutline, 4)
+    healthOutline.BorderSizePixel =
+        0
 
-    local healthBackground = Instance.new("Frame")
+    healthOutline.ZIndex =
+        5
+
+    healthOutline.Parent =
+        billboard
+
+    makeCorner(
+        healthOutline,
+        4
+    )
+
+    local healthBackground =
+        Instance.new("Frame")
+
     healthBackground.Name =
         "HealthBackground"
 
@@ -2816,13 +3204,23 @@ local function createESPBillboard(character, head)
     healthBackground.BackgroundColor3 =
         Color3.fromRGB(35, 35, 35)
 
-    healthBackground.BorderSizePixel = 0
-    healthBackground.ZIndex          = 6
-    healthBackground.Parent          = healthOutline
+    healthBackground.BorderSizePixel =
+        0
 
-    makeCorner(healthBackground, 3)
+    healthBackground.ZIndex =
+        6
 
-    local healthBar = Instance.new("Frame")
+    healthBackground.Parent =
+        healthOutline
+
+    makeCorner(
+        healthBackground,
+        3
+    )
+
+    local healthBar =
+        Instance.new("Frame")
+
     healthBar.Name =
         "ESP_HealthBar"
 
@@ -2838,29 +3236,64 @@ local function createESPBillboard(character, head)
     healthBar.BackgroundColor3 =
         Color3.fromRGB(0, 220, 80)
 
-    healthBar.BorderSizePixel = 0
-    healthBar.ZIndex          = 7
-    healthBar.Parent          = healthBackground
+    healthBar.BorderSizePixel =
+        0
 
-    makeCorner(healthBar, 3)
+    healthBar.ZIndex =
+        7
 
-    local infoLabel = Instance.new("TextLabel")
-    infoLabel.Name                   = "ESP_Info"
-    infoLabel.Position               = UDim2.fromOffset(0, 14)
-    infoLabel.Size                   = UDim2.fromOffset(
-        ESP_GUI_WIDTH,
-        22
+    healthBar.Parent =
+        healthBackground
+
+    makeCorner(
+        healthBar,
+        3
     )
-    infoLabel.BackgroundTransparency = 1
-    infoLabel.Font                   = Enum.Font.GothamBold
-    infoLabel.TextSize               = 14
-    infoLabel.TextColor3             = Color3.fromRGB(255, 255, 255)
-    infoLabel.TextStrokeTransparency = 0.45
-    infoLabel.TextXAlignment         = Enum.TextXAlignment.Center
-    infoLabel.TextYAlignment         = Enum.TextYAlignment.Center
-    infoLabel.Text                   = ""
-    infoLabel.ZIndex                 = 8
-    infoLabel.Parent                 = billboard
+
+    local infoLabel =
+        Instance.new("TextLabel")
+
+    infoLabel.Name =
+        "ESP_Info"
+
+    infoLabel.Position =
+        UDim2.fromOffset(0, 14)
+
+    infoLabel.Size =
+        UDim2.fromOffset(
+            ESP_GUI_WIDTH,
+            22
+        )
+
+    infoLabel.BackgroundTransparency =
+        1
+
+    infoLabel.Font =
+        Enum.Font.GothamBold
+
+    infoLabel.TextSize =
+        14
+
+    infoLabel.TextColor3 =
+        Color3.fromRGB(255, 255, 255)
+
+    infoLabel.TextStrokeTransparency =
+        0.45
+
+    infoLabel.TextXAlignment =
+        Enum.TextXAlignment.Center
+
+    infoLabel.TextYAlignment =
+        Enum.TextYAlignment.Center
+
+    infoLabel.Text =
+        ""
+
+    infoLabel.ZIndex =
+        8
+
+    infoLabel.Parent =
+        billboard
 
     return billboard
 end
@@ -2868,19 +3301,25 @@ end
 local function updateESP()
     if not Settings.ESP_Enabled then
         for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-                removeESPObjects(player.Character)
+            if player ~= LocalPlayer
+            and player.Character then
+                removeESPObjects(
+                    player.Character
+                )
             end
         end
 
         return
     end
 
-    local localCharacter = LocalPlayer.Character
+    local localCharacter =
+        LocalPlayer.Character
 
     local localRoot =
         localCharacter
-        and localCharacter:FindFirstChild("HumanoidRootPart")
+        and localCharacter:FindFirstChild(
+            "HumanoidRootPart"
+        )
 
     if not localRoot or not Camera then
         return
@@ -2891,7 +3330,8 @@ local function updateESP()
             continue
         end
 
-        local character = player.Character
+        local character =
+            player.Character
 
         if not character then
             continue
@@ -2903,10 +3343,14 @@ local function updateESP()
         end
 
         local humanoid =
-            character:FindFirstChildOfClass("Humanoid")
+            character:FindFirstChildOfClass(
+                "Humanoid"
+            )
 
         local root =
-            character:FindFirstChild("HumanoidRootPart")
+            character:FindFirstChild(
+                "HumanoidRootPart"
+            )
 
         local head =
             character:FindFirstChild("Head")
@@ -2929,7 +3373,10 @@ local function updateESP()
         end
 
         local distance =
-            (rootPos - localRoot.Position).Magnitude
+            (
+                rootPos
+                - localRoot.Position
+            ).Magnitude
 
         if distance > Settings.ESP_MaxDistance then
             removeESPObjects(character)
@@ -2937,16 +3384,26 @@ local function updateESP()
         end
 
         local highlight =
-            character:FindFirstChild("ESP_Highlight")
+            character:FindFirstChild(
+                "ESP_Highlight"
+            )
 
         if Settings.ESP_Highlight then
             if not highlight then
-                highlight = Instance.new("Highlight")
-                highlight.Name      = "ESP_Highlight"
-                highlight.Adornee   = character
+                highlight =
+                    Instance.new("Highlight")
+
+                highlight.Name =
+                    "ESP_Highlight"
+
+                highlight.Adornee =
+                    character
+
                 highlight.DepthMode =
                     Enum.HighlightDepthMode.AlwaysOnTop
-                highlight.Parent = character
+
+                highlight.Parent =
+                    character
             end
 
             highlight.FillColor =
@@ -2958,14 +3415,19 @@ local function updateESP()
             highlight.OutlineColor =
                 ESP_BOX_COLOR
 
-            highlight.OutlineTransparency = 0
-            highlight.Enabled = true
+            highlight.OutlineTransparency =
+                0
+
+            highlight.Enabled =
+                true
         elseif highlight then
             highlight:Destroy()
         end
 
         local billboard =
-            character:FindFirstChild("ESP_Billboard")
+            character:FindFirstChild(
+                "ESP_Billboard"
+            )
 
         if not billboard
         or not billboard:IsA("BillboardGui") then
@@ -2980,28 +3442,46 @@ local function updateESP()
                 )
         end
 
-        billboard.Adornee               = head
-        billboard.AlwaysOnTop           = true
-        billboard.LightInfluence        = 0
-        billboard.MaxDistance           = Settings.ESP_MaxDistance
-        billboard.Size                  = UDim2.fromOffset(
-            ESP_GUI_WIDTH,
-            ESP_GUI_HEIGHT
-        )
+        billboard.Adornee =
+            head
+
+        billboard.AlwaysOnTop =
+            true
+
+        billboard.LightInfluence =
+            0
+
+        billboard.MaxDistance =
+            Settings.ESP_MaxDistance
+
+        billboard.Size =
+            UDim2.fromOffset(
+                ESP_GUI_WIDTH,
+                ESP_GUI_HEIGHT
+            )
+
         billboard.StudsOffsetWorldSpace =
             Vector3.new(0, 2.7, 0)
-        billboard.Enabled = true
+
+        billboard.Enabled =
+            true
 
         local healthOutline =
-            billboard:FindFirstChild("HealthOutline")
+            billboard:FindFirstChild(
+                "HealthOutline"
+            )
 
         local healthBackground =
             healthOutline
-            and healthOutline:FindFirstChild("HealthBackground")
+            and healthOutline:FindFirstChild(
+                "HealthBackground"
+            )
 
         local healthBar =
             healthBackground
-            and healthBackground:FindFirstChild("ESP_HealthBar")
+            and healthBackground:FindFirstChild(
+                "ESP_HealthBar"
+            )
 
         if not healthOutline
         or not healthBackground
@@ -3015,15 +3495,21 @@ local function updateESP()
                 )
 
             healthOutline =
-                billboard:FindFirstChild("HealthOutline")
+                billboard:FindFirstChild(
+                    "HealthOutline"
+                )
 
             healthBackground =
                 healthOutline
-                and healthOutline:FindFirstChild("HealthBackground")
+                and healthOutline:FindFirstChild(
+                    "HealthBackground"
+                )
 
             healthBar =
                 healthBackground
-                and healthBackground:FindFirstChild("ESP_HealthBar")
+                and healthBackground:FindFirstChild(
+                    "ESP_HealthBar"
+                )
 
             if not healthBar then
                 continue
@@ -3033,7 +3519,10 @@ local function updateESP()
         local healthPercent =
             math.clamp(
                 humanoid.Health
-                / math.max(humanoid.MaxHealth, 1),
+                / math.max(
+                    humanoid.MaxHealth,
+                    1
+                ),
                 0,
                 1
             )
@@ -3043,7 +3532,8 @@ local function updateESP()
                 math.max(
                     0,
                     math.floor(
-                        HEALTH_BAR_WIDTH * healthPercent
+                        HEALTH_BAR_WIDTH
+                        * healthPercent
                     )
                 ),
                 HEALTH_BAR_HEIGHT
@@ -3051,21 +3541,38 @@ local function updateESP()
 
         if healthPercent > 0.6 then
             healthBar.BackgroundColor3 =
-                Color3.fromRGB(0, 220, 80)
+                Color3.fromRGB(
+                    0,
+                    220,
+                    80
+                )
         elseif healthPercent > 0.3 then
             healthBar.BackgroundColor3 =
-                Color3.fromRGB(255, 190, 0)
+                Color3.fromRGB(
+                    255,
+                    190,
+                    0
+                )
         else
             healthBar.BackgroundColor3 =
-                Color3.fromRGB(235, 45, 45)
+                Color3.fromRGB(
+                    235,
+                    45,
+                    45
+                )
         end
 
         local infoLabel =
-            billboard:FindFirstChild("ESP_Info")
+            billboard:FindFirstChild(
+                "ESP_Info"
+            )
 
         if infoLabel then
-            local showName  = Settings.ESP_Name
-            local showStuds = Settings.ESP_Studs
+            local showName =
+                Settings.ESP_Name
+
+            local showStuds =
+                Settings.ESP_Studs
 
             if showName and showStuds then
                 infoLabel.Text =
@@ -3076,10 +3583,14 @@ local function updateESP()
                         distance
                     )
 
-                infoLabel.Visible = true
+                infoLabel.Visible =
+                    true
             elseif showName then
-                infoLabel.Text    = player.Name
-                infoLabel.Visible = true
+                infoLabel.Text =
+                    player.Name
+
+                infoLabel.Visible =
+                    true
             elseif showStuds then
                 infoLabel.Text =
                     string.format(
@@ -3087,10 +3598,14 @@ local function updateESP()
                         distance
                     )
 
-                infoLabel.Visible = true
+                infoLabel.Visible =
+                    true
             else
-                infoLabel.Text    = ""
-                infoLabel.Visible = false
+                infoLabel.Text =
+                    ""
+
+                infoLabel.Visible =
+                    false
             end
         end
     end
@@ -3098,17 +3613,23 @@ end
 
 task.spawn(function()
     while not _killed do
-        if AutoclickActive and not isVoteScreenActive() then
+        if AutoclickActive
+        and not isVoteScreenActive() then
             if not Camera then
-                Camera = workspace.CurrentCamera
+                Camera =
+                    workspace.CurrentCamera
             end
 
             if Camera then
-                local vp = Camera.ViewportSize
+                local vp =
+                    Camera.ViewportSize
 
                 if vp then
-                    local cx = vp.X / 2
-                    local cy = vp.Y / 2
+                    local cx =
+                        vp.X / 2
+
+                    local cy =
+                        vp.Y / 2
 
                     VirtualInputManager:SendMouseButtonEvent(
                         cx,
@@ -3135,51 +3656,58 @@ task.spawn(function()
     end
 end)
 
-trackConn(RunService.RenderStepped:Connect(function()
-    if _killed then
-        return
-    end
-
-    if not Camera then
-        Camera = workspace.CurrentCamera
-    end
-
-    if not Camera then
-        return
-    end
-
-    if not LocalPlayer.Character then
-        return
-    end
-
-    updateCircle()
-    updateTracer()
-
-    if MenuFrame.Visible then
-        AutoclickActive = false
-        return
-    end
-
-    if Settings.Aimbot_Enabled then
-        if lockedTarget then
-            updateLockedBody()
-        else
-            local targetHead = getAimTarget()
-
-            if targetHead then
-                forceAimAtHead(targetHead)
-            end
+trackConn(
+    RunService.RenderStepped:Connect(function()
+        if _killed then
+            return
         end
-    else
-        lockedTarget = nil
-    end
 
-    if Settings.Triggerbot_Enabled then
-        AutoclickActive = shouldFire()
-    else
-        AutoclickActive = false
-    end
-end))
+        if not Camera then
+            Camera =
+                workspace.CurrentCamera
+        end
+
+        if not Camera then
+            return
+        end
+
+        if not LocalPlayer.Character then
+            return
+        end
+
+        updateCircle()
+        updateTracer()
+
+        if MenuFrame.Visible then
+            AutoclickActive = false
+            return
+        end
+
+        if Settings.Aimbot_Enabled then
+            if lockedTarget then
+                updateLockedBody()
+            else
+                local targetHead =
+                    getAimTarget()
+
+                if targetHead then
+                    forceAimAtHead(
+                        targetHead
+                    )
+                end
+            end
+        else
+            lockedTarget = nil
+        end
+
+        if Settings.Triggerbot_Enabled then
+            AutoclickActive =
+                shouldFire()
+        else
+            AutoclickActive = false
+        end
+    end)
+)
 
 task.spawn(function()
     while not _killed do
@@ -3193,144 +3721,92 @@ end)
 
 print(
     "Script loaded. "
-    .. (isMobile and "Tap <> button" or "Right Control")
+    .. (
+        isMobile
+        and "Tap <> button"
+        or "Right Control"
+    )
     .. " opens menu. Cache: "
     .. CACHE_FILE
 )
 ]]
 
-local SCRIPT_FILE = "rivals_main.lua"
-local QUEUE_FILE  = "rivals_queue.lua"
-local LOADER_FILE = "rivals_loader.lua"
+local CACHE_FOLDER = "Rivals Script by yes"
+local SCRIPT_FILE  = CACHE_FOLDER .. "/rivals_main.lua"
+local QUEUE_FILE   = CACHE_FOLDER .. "/rivals_queue.lua"
 
-local UPDATE_URL = "https://raw.githubusercontent.com/YesD3v/rivals/refs/heads/main/script"
-
-local function getRemoteSource()
-    local source = nil
-
+local function ensureCacheFolder()
     pcall(function()
-        if game
-        and game.HttpGet then
-            source = game:HttpGet(UPDATE_URL)
+        if makefolder then
+            local exists =
+                isfolder
+                and isfolder(CACHE_FOLDER)
+
+            if not exists then
+                makefolder(CACHE_FOLDER)
+            end
         end
     end)
-
-    if typeof(source) ~= "string"
-    or source == ""
-    then
-        return nil
-    end
-
-    return source
 end
 
-local function saveLoaderSource(source)
-    if typeof(source) ~= "string"
-    or source == ""
-    then
-        return false
-    end
-
-    local ok = pcall(function()
-        if writefile then
-            writefile(LOADER_FILE, source)
-        end
-    end)
-
-    return ok
-end
-
-local function readLoaderSource()
-    local source = nil
-
-    pcall(function()
-        if isfile and isfile(LOADER_FILE) then
-            source = readfile(LOADER_FILE)
-        end
-    end)
-
-    if typeof(source) ~= "string"
-    or source == ""
-    or source == "-- killed"
-    then
-        return nil
-    end
-
-    return source
-end
-
-local function updateSavedLoader()
-    local remoteSource = getRemoteSource()
-
-    if not remoteSource then
-        return nil, false
-    end
-
-    local localSource = readLoaderSource()
-
-    if not localSource or localSource ~= remoteSource then
-        if saveLoaderSource(remoteSource) then
-            return remoteSource, true
-        end
-    end
-
-    return localSource or remoteSource, false
-end
+ensureCacheFolder()
 
 pcall(function()
     if writefile then
-        writefile(SCRIPT_FILE, myScriptCode)
+        writefile(
+            SCRIPT_FILE,
+            myScriptCode
+        )
     end
 end)
 
-local initialRemoteSource = getRemoteSource()
-
-if initialRemoteSource then
-    saveLoaderSource(initialRemoteSource)
-end
-
-local fn, compileErr = loadstring(myScriptCode)
+local fn, compileErr =
+    loadstring(myScriptCode)
 
 if not fn then
-    warn("[rivals] loadstring compile error: " .. tostring(compileErr))
+    warn(
+        "[rivals] loadstring compile error: "
+        .. tostring(compileErr)
+    )
 else
-    local success, runErr = pcall(fn)
+    local success, runErr =
+        pcall(fn)
 
     if not success then
-        warn("[rivals] runtime error: " .. tostring(runErr))
+        warn(
+            "[rivals] runtime error: "
+            .. tostring(runErr)
+        )
     end
 end
 
 local queuePayload = [[
 task.wait(2)
 
-local UPDATE_URL  = "https://raw.githubusercontent.com/YesD3v/rivals/refs/heads/main/script"
-local SCRIPT_FILE = "rivals_main.lua"
-local QUEUE_FILE  = "rivals_queue.lua"
-local LOADER_FILE = "rivals_loader.lua"
+local CACHE_FOLDER = "Rivals Script by yes"
+local SCRIPT_FILE  = CACHE_FOLDER .. "/rivals_main.lua"
+local QUEUE_FILE   = CACHE_FOLDER .. "/rivals_queue.lua"
+
+local function ensureCacheFolder()
+    pcall(function()
+        if makefolder then
+            local exists =
+                isfolder
+                and isfolder(CACHE_FOLDER)
+
+            if not exists then
+                makefolder(CACHE_FOLDER)
+            end
+        end
+    end)
+end
+
+ensureCacheFolder()
 
 local function getQueueFn()
     return queue_on_teleport
         or (syn and syn.queue_on_teleport)
         or (fluxus and fluxus.queue_on_teleport)
-end
-
-local function httpGet(url)
-    local result = nil
-
-    pcall(function()
-        if game and game.HttpGet then
-            result = game:HttpGet(url)
-        end
-    end)
-
-    if typeof(result) ~= "string"
-    or result == ""
-    then
-        return nil
-    end
-
-    return result
 end
 
 local function readFileSafe(path)
@@ -3343,99 +3819,85 @@ local function readFileSafe(path)
     end)
 
     if typeof(result) ~= "string"
-    or result == ""
-    then
+    or result == "" then
         return nil
     end
 
     return result
 end
 
-local function writeFileSafe(path, data)
-    if typeof(data) ~= "string"
-    or data == ""
-    then
-        return false
-    end
+local code =
+    readFileSafe(SCRIPT_FILE)
 
-    local ok = pcall(function()
-        if writefile then
-            writefile(path, data)
-        end
-    end)
-
-    return ok
-end
-
-local remoteSource = httpGet(UPDATE_URL)
-local cachedLoader = readFileSafe(LOADER_FILE)
-
-local code = nil
-local usingUpdate = false
-
-if remoteSource then
-    if not cachedLoader or cachedLoader ~= remoteSource then
-        writeFileSafe(LOADER_FILE, remoteSource)
-        code = remoteSource
-        usingUpdate = true
-    elseif cachedLoader then
-        code = cachedLoader
-    end
-end
-
-if not code then
-    code = cachedLoader
-end
-
-if not code then
-    code = readFileSafe(SCRIPT_FILE)
-end
-
-if not code or code == "-- killed" then
-    print("[rivals] queue: no usable script found - chain stopped.")
+if not code
+or code == "-- killed" then
+    print(
+        "[rivals] queue: no usable script found - chain stopped."
+    )
     return
 end
 
 if loadstring then
-    local fn, ce = loadstring(code)
+    local fn, ce =
+        loadstring(code)
 
     if not fn then
-        warn("[rivals/queue] compile error: " .. tostring(ce))
+        warn(
+            "[rivals/queue] compile error: "
+            .. tostring(ce)
+        )
     else
-        local ok, e = pcall(fn)
+        local ok, e =
+            pcall(fn)
 
         if not ok then
-            warn("[rivals/queue] runtime error: " .. tostring(e))
-        elseif usingUpdate then
-            print("[rivals] update found on GitHub - loaded newest version.")
+            warn(
+                "[rivals/queue] runtime error: "
+                .. tostring(e)
+            )
         else
-            print("[rivals] GitHub version unchanged - loaded cached version.")
+            print(
+                "[rivals] cached script loaded."
+            )
         end
     end
 else
-    warn("[rivals/queue] loadstring is unavailable.")
+    warn(
+        "[rivals/queue] loadstring is unavailable."
+    )
 end
 
 local qf = getQueueFn()
 
 if qf then
-    local queueCode = readFileSafe(QUEUE_FILE)
+    local queueCode =
+        readFileSafe(QUEUE_FILE)
 
-    if queueCode and queueCode ~= "-- killed" then
+    if queueCode
+    and queueCode ~= "-- killed" then
         pcall(function()
             qf(queueCode)
         end)
 
-        print("[rivals] re-queued for next teleport.")
+        print(
+            "[rivals] re-queued for next teleport."
+        )
     else
-        print("[rivals] queue: rivals_queue.lua missing or killed - chain stopped.")
+        print(
+            "[rivals] queue file missing or killed - chain stopped."
+        )
     end
 end
 ]]
 
+ensureCacheFolder()
+
 pcall(function()
     if writefile then
-        writefile(QUEUE_FILE, queuePayload)
+        writefile(
+            QUEUE_FILE,
+            queuePayload
+        )
     end
 end)
 
@@ -3445,14 +3907,22 @@ local queueFunc =
     or (fluxus and fluxus.queue_on_teleport)
 
 if queueFunc then
-    local ok_read, storedQueue = pcall(function()
-        if isfile and isfile(QUEUE_FILE) then
-            return readfile(QUEUE_FILE)
-        end
-    end)
+    local ok_read, storedQueue =
+        pcall(function()
+            if isfile
+            and isfile(QUEUE_FILE) then
+                return readfile(
+                    QUEUE_FILE
+                )
+            end
+        end)
 
     local toQueue =
-        (ok_read and storedQueue and storedQueue ~= "-- killed")
+        (
+            ok_read
+            and storedQueue
+            and storedQueue ~= "-- killed"
+        )
         and storedQueue
         or queuePayload
 
@@ -3462,11 +3932,8 @@ if queueFunc then
 
     print(
         "[rivals] queued for next teleport. "
-        .. "GitHub update check enabled. "
         .. "Script saved to "
         .. SCRIPT_FILE
-        .. " / "
-        .. LOADER_FILE
     )
 else
     print(
